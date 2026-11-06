@@ -91,6 +91,8 @@ Khôi phục vào **DB trống khác** và thư mục dữ liệu trống khác:
 
 ## Sửa đăng nhập / khởi động (06/11/2026)
 
+Nếu Bootstrap.ps1 báo không đọc được trạng thái, xem [chẩn đoán bootstrap](docs/BOOTSTRAP_TROUBLESHOOTING.md). Bản mới hiện mã lỗi gốc, không yêu cầu gửi `.env` hoặc mật khẩu.
+
 Sau khi pull bản mới: `npm ci`, `npm run build`, `npm run migrate`, sau đó chạy `scripts/Bootstrap.ps1` trên Windows hoặc `npm run bootstrap` trong terminal tương tác. Không truyền mật khẩu trên dòng lệnh. Bootstrap Node cũng có lời nhắc ẩn nếu chưa có admin và chưa cấp ADMIN_PASSWORD. Mật khẩu được băm Argon2id; không lưu plaintext hoặc log mật khẩu.
 
 Đăng nhập bằng **Tên đăng nhập**, tài khoản quản trị là **admin**; email chỉ là thông tin liên hệ tùy chọn. Email của tài khoản cũ vẫn đăng nhập được. Migration 004 giữ nguyên hash/ID; tài khoản cũ khác được giữ tên đăng nhập email đầy đủ để tránh đụng tên. Admin duy nhất có email bắt đầu admin và grant Admin được chuyển username thành admin mà không đổi mật khẩu.

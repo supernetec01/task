@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { hash as passwordHash } from 'argon2';
 import { hiddenPrompt } from './secret-prompt.js';
 import { z } from 'zod';
+import { cliFailure, requireDatabaseConfiguration } from './cli-diagnostics.js';
 export async function migrate() {
   await tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock(3002001)');
@@ -97,10 +98,11 @@ export async function bootstrapAdmin(password?: string) {
 }
 async function main() {
   const cmd = process.argv[2];
+  requireDatabaseConfiguration(cmd);
   if (cmd === 'migrate') return migrate();
   if (cmd === 'bootstrap-status') {
     const existing = await tx((c) => one(c, "SELECT id FROM users WHERE lower(username)='admin'"));
-    console.log(JSON.stringify({ exists: !!existing }));
+    console.log(JSON.stringify({ ok: true, exists: !!existing }));
     return;
   }
   if (cmd === 'bootstrap') {
@@ -174,7 +176,10 @@ async function main() {
 if (/[/\\]cli\.(ts|js)$/.test(process.argv[1] || ''))
   main()
     .catch((e) => {
-      console.error(e.message);
+      const diagnostic = cliFailure(e);
+      if (process.argv[2] === 'bootstrap-status')
+        console.log(JSON.stringify({ ok: false, error: diagnostic }));
+      else console.error(`[${diagnostic.code}] ${diagnostic.message}\n${diagnostic.hint}`);
       process.exitCode = 1;
     })
     .finally(() => pool.end());
