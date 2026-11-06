@@ -1,0 +1,128 @@
+import { randomUUID } from 'node:crypto';
+import { writeFile, readFile } from 'node:fs/promises';
+import { join, extname } from 'node:path';
+import { z } from 'zod';
+import { type API } from './app.js';
+import {
+  one,
+  need,
+  dataDir,
+  hash,
+  audit,
+  type Actor,
+  type DB,
+  hasJob,
+  isAdmin,
+  manages,
+} from './base.js';
+import { taskAccess } from './tasks.js';
+export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
+  const r = await one(
+    c,
+    `SELECT r.*,u.team_id FROM records r JOIN users u ON u.id=r.owner_id WHERE r.id=$1 ${lock ? 'FOR UPDATE OF r' : ''}`,
+    [id],
+  );
+  need(r, 'Không tìm thấy hồ sơ', 404, 'NOT_FOUND');
+  need(
+    isAdmin(a) ||
+      (hasJob(a, r.role) &&
+        (r.owner_id === a.id || manages(a, { id: r.owner_id, team_id: r.team_id }))),
+    'Không tìm thấy hồ sơ',
+    404,
+    'NOT_FOUND',
+  );
+  return r;
+}
+export function sniff(ext: string, b: Buffer) {
+  if (ext === 'pdf') return b.subarray(0, 5).toString() === '%PDF-';
+  if (ext === 'png') return b.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  if (['jpg', 'jpeg'].includes(ext)) return b[0] === 255 && b[1] === 216 && b[2] === 255;
+  if (['zip', 'docx', 'xlsx'].includes(ext)) return b[0] === 80 && b[1] === 75;
+  if (ext === 'webp')
+    return b.subarray(0, 4).toString() === 'RIFF' && b.subarray(8, 12).toString() === 'WEBP';
+  if (ext === 'mp4') return b.subarray(4, 8).toString() === 'ftyp';
+  if (['txt', 'csv'].includes(ext)) return !b.includes(0);
+  return false;
+}
+export function fileRoutes(api: API) {
+  api('POST', '/assets', async (c, a, b) => {
+    const v = z
+      .object({
+        task_id: z.uuid().optional(),
+        record_id: z.uuid().optional(),
+        shared: z.enum(['true', 'false']).default('false'),
+      })
+      .parse(b.fields);
+    need(!!v.task_id !== !!v.record_id, 'Cần đúng một hồ sơ/task đính kèm', 422, 'VALIDATION');
+    let role = '';
+    if (v.task_id) {
+      const x = await taskAccess(c, a, v.task_id, true);
+      need(x.owner || x.manager || (x.support && x.s?.status === 'ACCEPTED'));
+      need(!['DONE', 'CANCELLED'].includes(x.t.status), 'Công việc đã đóng', 409, 'STATE');
+      role = x.owner || x.manager ? x.t.role : x.s.role;
+      need(
+        x.owner || x.manager || v.shared === 'true',
+        'Tệp hỗ trợ phải được chia sẻ vào công việc',
+        422,
+        'VALIDATION',
+      );
+    } else {
+      const r = await recordAccess(c, a, v.record_id!);
+      need(r.owner_id === a.id || isAdmin(a));
+      role = r.role;
+    }
+    const ext = extname(b.filename).slice(1).toLowerCase(),
+      allowed = (
+        process.env.UPLOAD_EXTENSIONS || 'pdf,png,jpg,jpeg,webp,txt,csv,xlsx,docx,mp4,zip'
+      ).split(',');
+    need(
+      allowed.includes(ext) && sniff(ext, b.buffer),
+      'Loại/nội dung tệp không hợp lệ hoặc chưa được cho phép',
+      422,
+      'FILE_TYPE',
+    );
+    need(b.buffer.length > 0, 'Tệp rỗng', 422, 'FILE_EMPTY');
+    const id = randomUUID(),
+      key = id + '.' + ext;
+    await writeFile(join(dataDir, key), b.buffer, { mode: 0o600, flag: 'wx' });
+    const f = await one(
+      c,
+      'INSERT INTO assets(id,task_id,record_id,uploaded_by,role,filename,storage_key,size,sha256,mime,shared) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id,filename,size,sha256',
+      [
+        id,
+        v.task_id || null,
+        v.record_id || null,
+        a.id,
+        role,
+        String(b.filename)
+          .replace(/[\\/\x00-\x1f]/g, '_')
+          .slice(0, 200),
+        key,
+        b.buffer.length,
+        hash(b.buffer),
+        'application/octet-stream',
+        v.shared === 'true',
+      ],
+    );
+    await audit(c, a, 'FILE_UPLOADED', 'asset', id);
+    return f;
+  });
+  api('GET', '/assets/:id/download', async (c, a, b, q, p, reply) => {
+    const f = await one(c, 'SELECT * FROM assets WHERE id=$1', [p.id]);
+    need(f, 'Không tìm thấy tệp', 404, 'NOT_FOUND');
+    if (f.task_id) {
+      const x = await taskAccess(c, a, f.task_id);
+      need(x.owner || x.manager || (f.shared && x.support), 'Không tìm thấy tệp', 404, 'NOT_FOUND');
+    } else await recordAccess(c, a, f.record_id);
+    await audit(c, a, 'FILE_DOWNLOADED', 'asset', f.id);
+    const buffer = await readFile(join(dataDir, f.storage_key));
+    need(hash(buffer) === f.sha256, 'Tệp không khớp checksum', 500, 'FILE_INTEGRITY');
+    reply
+      .type('application/octet-stream')
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(f.filename)}`,
+      );
+    return buffer;
+  });
+}

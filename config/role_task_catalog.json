@@ -1,0 +1,106 @@
+{
+  "status": "PROPOSED_TEMPLATE_LIBRARY_NOT_MANDATORY_QUOTA",
+  "recurring_rules_default_enabled": false,
+  "roles": {
+    "CONTENT": [
+      "PRODUCT_RESEARCH",
+      "AUDIENCE_RESEARCH",
+      "COMPETITOR_RESEARCH",
+      "TREND_RESEARCH",
+      "CONTENT_PLAN",
+      "IDEA",
+      "SCRIPT",
+      "COPY",
+      "DESIGN_BRIEF",
+      "SHOOT_PREP",
+      "PROP_PREP",
+      "SHOOT",
+      "EDIT",
+      "PUBLISH",
+      "COMMUNITY",
+      "MEASURE",
+      "PERFORMANCE_AUDIT",
+      "OPTIMIZE",
+      "LOCALIZE",
+      "BRAND_GUIDE",
+      "ASSET_ORGANIZE",
+      "CONTENT_INCIDENT",
+      "LIVE_PREP",
+      "LIVE_SESSION",
+      "KOC_BRIEF",
+      "OTHER"
+    ],
+    "DESIGNER": [
+      "DESIGN",
+      "THUMBNAIL",
+      "BANNER",
+      "SOURCE_HANDOVER",
+      "OTHER"
+    ],
+    "MARKETPLACE": [
+      "LISTING_CREATE",
+      "LISTING_UPDATE",
+      "LISTING_AUDIT",
+      "PRODUCT_SEO",
+      "PROMOTION_PREP",
+      "SHOP_DAILY_REVIEW",
+      "SHOP_WEEKLY_REPORT",
+      "ORDER_CASE",
+      "RETURN_CANCEL_REVIEW",
+      "COMPENSATION_ENTRY",
+      "KOC_BOOKING",
+      "KOC_FOLLOWUP",
+      "SAMPLE_SHIP_FOLLOWUP",
+      "OTHER"
+    ],
+    "ADS": [
+      "AD_PLAN",
+      "AD_SETUP_RECORD",
+      "AD_CREATIVE_REVIEW",
+      "AD_MONITOR",
+      "AD_OPTIMIZE",
+      "AD_IMPORT",
+      "AD_ANALYSIS",
+      "OTHER"
+    ],
+    "HR": [
+      "CANDIDATE_INTAKE",
+      "INTERVIEW_SCHEDULE",
+      "EMPLOYEE_ONBOARD",
+      "HR_PROFILE_UPDATE",
+      "HR_EVENT_CHECK",
+      "EMPLOYEE_OFFBOARD",
+      "OTHER"
+    ],
+    "ACCOUNTANT": [
+      "DOCUMENT_CHECK",
+      "RECONCILE",
+      "PURCHASE_DOC_FOLLOWUP",
+      "PAYMENT_REQUEST_PROCESS",
+      "ADVANCE_SETTLEMENT",
+      "REIMBURSEMENT_PROCESS",
+      "SALES_INVOICE_REQUEST_PROCESS",
+      "OTHER"
+    ],
+    "WAREHOUSE": [
+      "SAMPLE_ISSUE",
+      "SAMPLE_RETURN",
+      "EQUIPMENT_HANDOVER",
+      "BIGSELLER_RECONCILE",
+      "OUTBOUND_REPORT",
+      "OTHER"
+    ],
+    "INTERN": [
+      "LEARNING",
+      "PRACTICE",
+      "MENTOR_REVIEW",
+      "OTHER"
+    ],
+    "TESTER_OPTIONAL": [
+      "BUG_REPRODUCE",
+      "FEATURE_REVIEW",
+      "RETEST",
+      "OTHER"
+    ]
+  }
+}

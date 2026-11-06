@@ -1,0 +1,18 @@
+{
+  "status": "CATALOG_FROM_USER_EXAMPLES",
+  "platforms": [
+    "TIKTOK",
+    "SHOPEE",
+    "FACEBOOK",
+    "ZALO",
+    "EMAIL",
+    "GOOGLE",
+    "CHATGPT",
+    "NAS",
+    "INTERNAL",
+    "OTHER"
+  ],
+  "automatic_platform_password_change": false,
+  "credential_history_reader": "ADMIN",
+  "production_secrets_in_demo": false
+}

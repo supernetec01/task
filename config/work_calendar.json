@@ -1,0 +1,81 @@
+{
+  "status": "CONFIRMED_BASE_WITH_OPEN_EXCEPTIONS",
+  "timezone": "Asia/Ho_Chi_Minh",
+  "response_working_minutes": 480,
+  "response_clock_start": "assignment_committed_at",
+  "weekdays": {
+    "1": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ],
+    "2": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ],
+    "3": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ],
+    "4": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ],
+    "5": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ],
+    "6": [
+      [
+        "09:00",
+        "12:00"
+      ],
+      [
+        "13:00",
+        "18:00"
+      ]
+    ]
+  },
+  "sunday": [],
+  "date_exceptions": {},
+  "open_decisions": [
+    "Q01",
+    "Q02"
+  ],
+  "report_week_proposal": {
+    "start_iso_weekday": 1,
+    "end_exclusive_next_monday": true,
+    "requires_decision": "Q05"
+  },
+  "support_response_timeout": null,
+  "support_timeout_requires_decision": "Q10"
+}

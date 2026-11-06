@@ -1,0 +1,70 @@
+{
+  "status": "DESIGN_CONTRACT",
+  "task": {
+    "states": [
+      "DRAFT",
+      "ASSIGNED",
+      "ACCEPTED",
+      "IN_PROGRESS",
+      "SUBMITTED",
+      "CHANGES_REQUESTED",
+      "DONE",
+      "DECLINED",
+      "CANCELLED"
+    ],
+    "rules": [
+      "ASSIGNED->ACCEPTED bởi assignee trước response deadline",
+      "ASSIGNED->DECLINED do decline/timeout; attempt giữ reason riêng",
+      "ACCEPTED->IN_PROGRESS bởi owner",
+      "IN_PROGRESS/CHANGES_REQUESTED->SUBMITTED tạo revision",
+      "SUBMITTED->CHANGES_REQUESTED hoặc DONE bởi reviewer đúng revision",
+      "DONE->IN_PROGRESS chỉ khi Q14 enabled và có reason"
+    ]
+  },
+  "support": {
+    "states": [
+      "PENDING",
+      "ACCEPTED",
+      "DECLINED",
+      "REVOKED"
+    ],
+    "transitions": [
+      {
+        "from": "PENDING",
+        "to": "ACCEPTED",
+        "actor": "INVITEE"
+      },
+      {
+        "from": "PENDING",
+        "to": "DECLINED",
+        "actor": "INVITEE"
+      }
+    ],
+    "extra_transitions_disabled_until_decision": [
+      "revoke",
+      "reinvite",
+      "withdraw_after_accept",
+      "timeout"
+    ]
+  },
+  "request_proposed": {
+    "states": [
+      "DRAFT",
+      "SUBMITTED",
+      "NEEDS_INFO",
+      "APPROVED",
+      "REJECTED",
+      "CANCELLED",
+      "FULFILLING",
+      "FULFILLED",
+      "CLOSED"
+    ],
+    "approval_missing": "CONFIG_REQUIRED",
+    "note": "Yêu cầu thông tin có thể nộp revision mới; APPROVED nhu cầu không tự có nghĩa approved mua, paid, invoice-issued"
+  },
+  "report": {
+    "draft": "mutable owner only",
+    "submitted_revision": "immutable",
+    "revisions": "new append only; no delete/overwrite"
+  }
+}

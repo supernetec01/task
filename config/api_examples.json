@@ -1,0 +1,86 @@
+{
+  "status": "SYNTHETIC_CONTRACT_EXAMPLES_NOT_REAL_DATA",
+  "ids": {
+    "workspace": "10000000-0000-4000-8000-000000000001",
+    "owner": "10000000-0000-4000-8000-000000000002",
+    "supporter": "10000000-0000-4000-8000-000000000003",
+    "decliner": "10000000-0000-4000-8000-000000000004",
+    "manager": "10000000-0000-4000-8000-000000000005",
+    "boss": "10000000-0000-4000-8000-000000000006",
+    "role_content": "10000000-0000-4000-8000-000000000007",
+    "role_design": "10000000-0000-4000-8000-000000000008",
+    "task": "10000000-0000-4000-8000-000000000009",
+    "report": "10000000-0000-4000-8000-000000000010",
+    "revision": "10000000-0000-4000-8000-000000000011",
+    "channel": "10000000-0000-4000-8000-000000000012"
+  },
+  "create_task": {
+    "headers": {
+      "Idempotency-Key": "fixture-create-task-001"
+    },
+    "body": {
+      "title": "Chuẩn bị video mẫu",
+      "owner_id": "10000000-0000-4000-8000-000000000002",
+      "due_at": "2026-11-07T10:00:00Z",
+      "description": "Mẫu giả để kiểm thử.",
+      "supporters": [
+        {
+          "user_id": "10000000-0000-4000-8000-000000000003",
+          "role_id": "10000000-0000-4000-8000-000000000008"
+        }
+      ],
+      "principal_role_id": "10000000-0000-4000-8000-000000000007"
+    },
+    "response": {
+      "data": {
+        "id": "10000000-0000-4000-8000-000000000009",
+        "code": "SN-TEST-001",
+        "status": "ASSIGNED",
+        "row_version": 1
+      },
+      "capabilities": [
+        "read",
+        "respond_if_assignee"
+      ]
+    }
+  },
+  "support_response": {
+    "headers": {
+      "Idempotency-Key": "fixture-accept-001"
+    },
+    "body": {
+      "decision": "ACCEPT",
+      "note": "Có thể hỗ trợ phần ảnh.",
+      "expected_version": 1
+    },
+    "response": {
+      "invitation_status": "ACCEPTED",
+      "task_status_unchanged": true
+    }
+  },
+  "submit_report": {
+    "headers": {
+      "Idempotency-Key": "fixture-report-submit-001"
+    },
+    "body": {
+      "period_start": "2026-11-02",
+      "expected_draft_versions": {
+        "COMMON": 3
+      }
+    },
+    "response": {
+      "report_id": "10000000-0000-4000-8000-000000000010",
+      "revision_id": "10000000-0000-4000-8000-000000000011",
+      "revision_no": 1,
+      "submitted_at": "2026-11-06T10:00:00Z",
+      "status": "SUBMITTED",
+      "recipients_resolved_server_side": true
+    }
+  },
+  "error_409": {
+    "code": "STALE_VERSION",
+    "message": "Dữ liệu đã được cập nhật. Nội dung nháp của bạn vẫn được giữ.",
+    "request_id": "fixture-request-42",
+    "retryable": false
+  }
+}
