@@ -38,7 +38,10 @@ export function Team({ me }: { me: any }) {
               <tr key={u.id}>
                 <td>
                   {u.name}
-                  <div className="row-meta">{u.email}</div>
+                  <div className="row-meta">
+                    {u.username}
+                    {u.email ? ` · ${u.email}` : ''}
+                  </div>
                 </td>
                 <td>
                   <Badge>{u.active ? 'Đang hoạt động' : 'Đã vô hiệu hóa'}</Badge>
@@ -76,10 +79,11 @@ export function Team({ me }: { me: any }) {
           <Form
             fields={[
               { key: 'name', label: 'Họ tên', required: true },
-              { key: 'email', label: 'Email đăng nhập', type: 'email', required: true },
+              { key: 'username', label: 'Tên đăng nhập', required: true },
+              { key: 'email', label: 'Email liên hệ (không bắt buộc)', type: 'email' },
               {
                 key: 'password',
-                label: 'Mật khẩu khởi tạo (ít nhất 12 ký tự)',
+                label: 'Mật khẩu khởi tạo (ít nhất 11 ký tự)',
                 type: 'password',
                 required: true,
               },
@@ -102,6 +106,7 @@ export function Team({ me }: { me: any }) {
                 '/users',
                 {
                   ...v,
+                  email: v.email || null,
                   team_id: v.team_id || null,
                   manager_id: v.manager_id || null,
                   reviewer_id: v.reviewer_id || null,

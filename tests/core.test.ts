@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import {
   pool,
   tx,
@@ -12,7 +12,7 @@ import {
   actor,
   type Actor,
 } from '../server/base.js';
-import { createUser, migrate } from '../server/cli.js';
+import { createUser, migrate, bootstrapAdmin } from '../server/cli.js';
 import { buildApp } from '../server/app.js';
 import { runJobs } from '../server/worker.js';
 import { comparison } from '../server/reports.js';
@@ -1228,6 +1228,71 @@ test('Draft dispatch completes missing deadline; supporting documents can be upl
   const pending = await ok('support', 'GET', '/tasks/' + d.id);
   assert.equal(pending.assets.length, 1);
   assert.equal(pending.pending_brief, true);
+});
+test('Username admin bootstrap accepts exactly 11 characters, hashes secret and never overwrites an existing account', async () => {
+  const secret = randomBytes(9).toString('base64url').slice(0, 11);
+  const first = await bootstrapAdmin(secret);
+  assert.equal(first.created, true);
+  const before = (await pool.query("SELECT password_hash FROM users WHERE username='admin'"))
+    .rows[0].password_hash;
+  assert(before.startsWith('$argon2id$'));
+  assert.notEqual(before, secret);
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.110',
+    payload: { username: 'admin', password: secret },
+  });
+  assert.equal(login.statusCode, 200, login.body);
+  const second = await bootstrapAdmin(randomBytes(16).toString('hex'));
+  assert.equal(second.created, false);
+  assert.equal(second.id, first.id);
+  assert.equal(
+    (await pool.query("SELECT password_hash FROM users WHERE username='admin'")).rows[0]
+      .password_hash,
+    before,
+  );
+  const retry = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.111',
+    payload: { username: 'ADMIN', password: secret },
+  });
+  assert.equal(retry.statusCode, 200);
+  const cookie = login.headers['set-cookie']!.toString().split(';')[0],
+    csrf = login.json().csrf;
+  const headers = { cookie, 'x-csrf-token': csrf, 'idempotency-key': randomUUID() };
+  const created = await app.inject({
+    method: 'POST',
+    url: '/api/v1/users',
+    headers,
+    payload: {
+      username: 'username_only',
+      name: 'No email needed',
+      password: secret,
+      team_id: null,
+    },
+  });
+  assert.equal(created.statusCode, 200, created.body);
+  const noEmail = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.112',
+    payload: { username: 'username_only', password: secret },
+  });
+  assert.equal(noEmail.statusCode, 200);
+  const tooShort = await app.inject({
+    method: 'POST',
+    url: '/api/v1/users',
+    headers: { ...headers, 'idempotency-key': randomUUID() },
+    payload: {
+      username: 'short_password',
+      name: 'Rejected',
+      password: secret.slice(0, 10),
+      team_id: null,
+    },
+  });
+  assert.equal(tooShort.statusCode, 422);
 });
 test('Disabled account/session and logout deny subsequent API', async () => {
   await pool.query('UPDATE users SET active=false WHERE id=$1', [ids.outside]);

@@ -111,7 +111,7 @@ function App() {
         <ErrorBox error={error} />
         <Form
           fields={[
-            { key: 'email', label: 'Email', type: 'email', required: true },
+            { key: 'username', label: 'Tên đăng nhập', required: true },
             { key: 'password', label: 'Mật khẩu', type: 'password', required: true },
           ]}
           onSubmit={async (v) => {
@@ -291,7 +291,7 @@ function App() {
                   },
                   {
                     key: 'new_password',
-                    label: 'Mật khẩu mới (ít nhất 12 ký tự)',
+                    label: 'Mật khẩu mới (ít nhất 11 ký tự)',
                     type: 'password',
                     required: true,
                   },

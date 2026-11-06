@@ -7,7 +7,7 @@ Môi trường thực thi: Debian 13, Node.js 24.22.1, PostgreSQL 17 image chín
 | Lệnh / kiểm tra | Kết quả |
 |---|---|
 | `npm run build` | TypeScript UI/API + build JavaScript server và Vite production đạt |
-| `npm test` | **35/35** nhóm kiểm thử đạt, 0 skipped/disabled, PostgreSQL thực |
+| `npm test` | **36/36** nhóm kiểm thử đạt, 0 skipped/disabled, PostgreSQL thực |
 | `npm run test:e2e` | **8/8** bài đạt: 4 kịch bản × desktop 1440×1000 và mobile 390×844 |
 | `npm audit` và `npm audit --omit=dev` | 0 vulnerabilities ở lượt đã chạy |
 | Compiled `node build/server/main.js` với NODE_ENV=production | health DB + static bundle đạt trên loopback |
@@ -47,7 +47,7 @@ Các lỗi tìm thấy ở lượt trước (nhãn required/icon ảnh hưởng 
 
 ## Giới hạn và phần cần nghiệm thu tiếp
 
-**35 integration groups + 8 E2E không có nghĩa 76 ca gốc đều đã đạt đầy đủ.** `ACCEPTANCE_STATUS.csv` phân biệt scope được automation bao phủ và các ca PARTIAL. Checklist gốc giữ nguyên trong `docs/reference/acceptance.csv`.
+**36 integration groups + 8 E2E không có nghĩa 76 ca gốc đều đã đạt đầy đủ.** `ACCEPTANCE_STATUS.csv` phân biệt scope được automation bao phủ và các ca PARTIAL. Checklist gốc giữ nguyên trong `docs/reference/acceptance.csv`.
 
 - Windows PowerShell/Task Scheduler/S4U, Windows filesystem ACL, firewall, reboot và truy cập LAN từ thiết bị công ty: **chưa chạy trên máy thật**.
 - Nguồn TikTok/Shopee/ads/KOC thật, reconciliation/currency/attribution, số lượng người dùng/dữ liệu lớn: **chưa được cung cấp để nghiệm thu**. Không dùng số screenshot thành dữ liệu thật.
@@ -59,3 +59,9 @@ Các lỗi tìm thấy ở lượt trước (nhãn required/icon ảnh hưởng 
 ## Chạy lại
 
 Chỉ dùng DB có hậu tố `_test` và DATA_DIR riêng. `npm test` truncate toàn bộ bảng ứng dụng trong DB test trước tạo fixture. Sau đó `npm run build` và `npm run test:e2e`. Trên máy không có Chromium sẵn, cài browser test bằng Playwright. Không trỏ các lệnh này vào DB đang dùng cho nhân viên.
+
+## Bổ sung username/admin — 06/11/2026
+
+Migration 004 thêm username và email tùy chọn, giữ ID/hash cũ. Bộ tích hợp mới có 36 nhóm, bao gồm password 11 ký tự, username không email, bootstrap thật trên PostgreSQL và chạy lại không đổi hash. Lượt kiểm thử dùng DB mới riêng, không truncate DB cloud đang có dữ liệu. Bootstrap trên DB cloud hiện có cũng đã chạy thật, chuyển tài khoản admin fixture cũ thành username admin và giữ nguyên hash/ID. Không tạo hay đặt lại mật khẩu đã chọn của người dùng trên máy Windows từ xa.
+
+`npm start` được chạy thật trên 0.0.0.0:3002; xác minh health/static, đăng nhập admin, quyền Admin, tiến trình vẫn trả health sau các request. Kiểm tra tiến trình con chiếm cùng cổng phải thoát 1 và hiện EADDRINUSE, giữ server đang chạy. Lời nhắc PowerShell và Windows LAN vẫn cần kiểm chứng tại máy công ty.

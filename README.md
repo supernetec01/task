@@ -24,7 +24,7 @@
    .\scripts\Bootstrap.ps1
    ```
 
-   Bootstrap hỏi email/mật khẩu quản trị qua máy của bạn; không có mật khẩu mặc định. Chỉ tạo được khi DB chưa có tài khoản.
+   Bootstrap tạo username **admin**, hỏi mật khẩu ẩn ít nhất **11 ký tự** và xác nhận lại; không cần email. Nếu admin đã có thì giữ nguyên ID, mật khẩu và dữ liệu, không hỏi để ghi đè. Tài khoản admin bị khóa/thiếu quyền cần quản trị hiện tại kiểm tra, bootstrap không tự nâng quyền.
 5. Mở hai cửa sổ PowerShell tại dự án:
 
    ```powershell
@@ -53,11 +53,11 @@ npm start
 npm run worker
 ```
 
-Trước `bootstrap`, cung cấp `ADMIN_EMAIL` và `ADMIN_PASSWORD` qua biến môi trường cục bộ an toàn, không ghi vào Git/log. Trên Windows ưu tiên `Bootstrap.ps1` vì mật khẩu được nhập ẩn. Bản production chạy JavaScript đã build trong `build/server`, frontend trong `dist`, không dùng dev server. Cần build lại sau khi thay mã. `npm run dev` chỉ dành cho phát triển API; có thể chạy `npx vite --host 127.0.0.1` để phát triển UI với proxy API.
+Trước `bootstrap`, cung cấp `ADMIN_PASSWORD` qua biến môi trường cục bộ an toàn, không ghi vào Git/log. Trên Windows ưu tiên `Bootstrap.ps1` vì mật khẩu được nhập ẩn. Bản production chạy JavaScript đã build trong `build/server`, frontend trong `dist`, không dùng dev server. Cần build lại sau khi thay mã. `npm run dev` chỉ dành cho phát triển API; có thể chạy `npx vite --host 127.0.0.1` để phát triển UI với proxy API.
 
 ## Demo độc lập
 
-Tạo **DB trống riêng** và DATA_DIR riêng, cấu hình `.env` trỏ tới DB đó, đặt `DEMO_MODE=true`, cấp `DEMO_PASSWORD` ít nhất 12 ký tự qua môi trường rồi chạy `npm run migrate` và `npm run seed:demo`. Không chạy seed trên production; script từ chối DB đã có tài khoản. Demo không thêm doanh thu hay hồ sơ HR giả vào dữ liệu thật.
+Tạo **DB trống riêng** và DATA_DIR riêng, cấu hình `.env` trỏ tới DB đó, đặt `DEMO_MODE=true`, cấp `DEMO_PASSWORD` ít nhất 11 ký tự qua môi trường rồi chạy `npm run migrate` và `npm run seed:demo`. Không chạy seed trên production; script từ chối DB đã có tài khoản. Demo không thêm doanh thu hay hồ sơ HR giả vào dữ liệu thật.
 
 Tài khoản demo: `admin@demo.local`, `manager@demo.local`, `boss@demo.local`, `employee@demo.local`, `support@demo.local`, `hr@demo.local`, `sales@demo.local`, `ads@demo.local`. Tất cả dùng **mật khẩu bạn vừa cung cấp**, không có mật khẩu cố định trong mã. Demo bật các policy cơ bản chỉ trong DB demo và có nhãn MÔI TRƯỜNG DEMO.
 
@@ -88,3 +88,13 @@ Khôi phục vào **DB trống khác** và thư mục dữ liệu trống khác:
 ## Kiểm thử
 
 `npm test` **xóa dữ liệu các bảng trong DB có hậu tố `_test`** rồi tạo fixture riêng; tuyệt đối không trỏ DATABASE_URL tới dữ liệu thật. `npm run test:e2e` chạy bản build bằng Chromium qua loopback: cần chạy `npm test` trước để tạo tài khoản fixture. Dùng `npx playwright install chromium` nếu máy chưa có trình duyệt cho test. Xem `docs/TESTING.md` để phân biệt kết quả đã chạy và kiểm tra tại công ty còn chờ.
+
+## Sửa đăng nhập / khởi động (06/11/2026)
+
+Sau khi pull bản mới: `npm ci`, `npm run build`, `npm run migrate`, sau đó chạy `scripts/Bootstrap.ps1` trên Windows hoặc `npm run bootstrap` trong terminal tương tác. Không truyền mật khẩu trên dòng lệnh. Bootstrap Node cũng có lời nhắc ẩn nếu chưa có admin và chưa cấp ADMIN_PASSWORD. Mật khẩu được băm Argon2id; không lưu plaintext hoặc log mật khẩu.
+
+Đăng nhập bằng **Tên đăng nhập**, tài khoản quản trị là **admin**; email chỉ là thông tin liên hệ tùy chọn. Email của tài khoản cũ vẫn đăng nhập được. Migration 004 giữ nguyên hash/ID; tài khoản cũ khác được giữ tên đăng nhập email đầy đủ để tránh đụng tên. Admin duy nhất có email bắt đầu admin và grant Admin được chuyển username thành admin mà không đổi mật khẩu.
+
+Trong `.env`, đặt `HOST=0.0.0.0`, `PORT=3002`. Chạy `npm start` và giữ cửa sổ mở; terminal phải hiện `Super Net is running on 0.0.0.0:3002`. Kiểm tra `http://localhost:3002/api/health`. PowerShell `scripts/Start-SuperNet.ps1` mặc định đặt đúng host/port; có thể chỉ định ListenHost/Port khi kiểm thử riêng.
+
+Log HTTP production trước đây chỉ vào `DATA_DIR/logs`, không in console. Trên cloud chưa tái hiện được việc tiến trình cũ tự thoát thành công; không khẳng định nguyên nhân Windows khi chưa có exit code/log trên máy đó. Bản sửa in banner sau bind thành công, kiểm tra DB/migration, báo lỗi khởi động ra stderr và thoát mã 1. `npm start` từ chối build thiếu/cũ thay vì dùng artifact không đồng bộ; chạy lại `npm run build`. Với `EADDRINUSE`, xem tiến trình chiếm 3002, không tự dừng dịch vụ lạ; lỗi PostgreSQL cần kiểm tra dịch vụ/URL riêng. Nếu vẫn thoát, xem `$LASTEXITCODE` và thông báo ngay trong terminal. Không cần in nội dung .env hay mật khẩu để chẩn đoán.

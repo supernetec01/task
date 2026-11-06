@@ -9,4 +9,4 @@ if ($LASTEXITCODE -ne 0) { throw 'Dependency install failed.' }
 if ($LASTEXITCODE -ne 0) { throw 'Production build failed.' }
 & node build/server/cli.js migrate
 if ($LASTEXITCODE -ne 0) { throw 'Migration failed. Inspect DB credentials and migration logs.' }
-Write-Output 'Build and migration completed. Run Bootstrap.ps1 only for an empty production database, or use the isolated demo instructions.'
+Write-Output 'Build and migration completed. Run Bootstrap.ps1 to create admin without overwriting an existing account, or use the isolated demo instructions.'

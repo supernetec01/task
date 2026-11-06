@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 const password = 'Integration-Test-Password-2026!';
 async function login(page: Page, user: string) {
   await page.goto('/');
-  await page.getByLabel('Email', { exact: true }).fill(user + '@test.local');
+  await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user + '@test.local');
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Tổng quan công việc' })).toBeVisible();

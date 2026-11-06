@@ -10,12 +10,14 @@ export const pool = new pg.Pool({
       ? process.env.MIGRATION_DATABASE_URL || process.env.DATABASE_URL
       : process.env.DATABASE_URL,
   max: 12,
+  connectionTimeoutMillis: 10000,
 });
 export type DB = pg.PoolClient;
 export type Actor = {
   id: string;
   name: string;
-  email: string;
+  username: string;
+  email: string | null;
   team_id: string | null;
   grants: any[];
   csrf: string;
@@ -72,7 +74,11 @@ export const rows = async (c: DB, sql: string, args: unknown[] = []) =>
 export const one = async (c: DB, sql: string, args: unknown[] = []) =>
   (await rows(c, sql, args))[0];
 export async function actor(c: DB, id: string): Promise<Actor> {
-  const u = await one(c, 'SELECT id,name,email,team_id FROM users WHERE id=$1 AND active', [id]);
+  const u = await one(
+    c,
+    'SELECT id,username,name,email,team_id FROM users WHERE id=$1 AND active',
+    [id],
+  );
   need(u, 'Tài khoản đã bị vô hiệu hóa', 401, 'UNAUTHORIZED');
   u.grants = await rows(
     c,

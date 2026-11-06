@@ -1,6 +1,6 @@
 # Mô hình dữ liệu thực thi
 
-`docs/reference/candidate-schema.sql` là thiết kế tham khảo, không chạy vào database ứng dụng. `migrations/001.sql` → `002.sql` → `003.sql` là migration thực tế, atomic, có bảng `schema_migrations` và advisory lock ngăn hai lần migrate đồng thời.
+`docs/reference/candidate-schema.sql` là thiết kế tham khảo, không chạy vào database ứng dụng. `migrations/001.sql` → `002.sql` → `003.sql` → `004.sql` là migration thực tế, atomic, có bảng `schema_migrations` và advisory lock ngăn hai lần migrate đồng thời.
 
 | Khối | Bảng | Thiết kế áp dụng |
 |---|---|---|
@@ -19,3 +19,5 @@
 Không tạo sẵn sổ tài chính/tồn kho giả. Các hồ sơ nghề nghiệp không thay bảng giao dịch tài chính đầy đủ; nếu mở rộng PO/receipt/invoice matching/payment allocation phải bổ sung relational schema/constraints và policy theo tài liệu gốc trước vận hành.
 
 DB production: migration role riêng có quyền DDL; runtime role không superuser/không owner, chỉ CONNECT + USAGE schema + SELECT/INSERT/UPDATE/DELETE trên bảng và USAGE/SELECT sequence. Trigger immutable tiếp tục chặn UPDATE/DELETE lịch sử ngay cả khi runtime được DML. Backup role cần SELECT; quyền tạo DB/restore chỉ dành vận hành. Frontend không kết nối trực tiếp PostgreSQL. RLS đa tenant không dùng vì mỗi instance là một workspace; authorization bản ghi nằm tại API.
+
+Migration 004 bổ sung username duy nhất không phân biệt hoa/thường và email liên hệ tùy chọn. Giữ ID/hash của users cũ, không xóa hay đặt lại mật khẩu. Bootstrap admin có advisory lock, chạy lại không ghi đè tài khoản.

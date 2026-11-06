@@ -92,54 +92,61 @@ export async function buildApp() {
               : e.statusCode || 500;
     if (status >= 500)
       req.log.error({ err: { message: e.message, code: e.code } }, 'request failed');
-    reply
-      .status(status)
-      .send({
-        code:
-          e instanceof Fault
-            ? e.code
-            : e instanceof ZodError
-              ? 'VALIDATION'
-              : status === 409
-                ? 'CONFLICT'
-                : status === 429
-                  ? 'RATE_LIMIT'
-                  : status >= 500
-                    ? 'INTERNAL_ERROR'
-                    : 'REQUEST_ERROR',
-        message:
-          e instanceof Fault
-            ? e.message
-            : e instanceof ZodError
-              ? 'Dữ liệu không hợp lệ'
-              : status === 409
-                ? 'Dữ liệu đã tồn tại hoặc vừa thay đổi'
-                : status === 429
-                  ? 'Bạn đã thử quá nhiều lần. Vui lòng chờ một phút rồi thử lại.'
-                  : status >= 500
-                    ? 'Không thể lưu. Vui lòng thử lại; nội dung chưa được xác nhận.'
-                    : 'Yêu cầu không hợp lệ',
-        field_errors: e instanceof ZodError ? e.issues : undefined,
-        request_id: req.id,
-        retryable: status >= 500 || status === 429,
-      });
+    reply.status(status).send({
+      code:
+        e instanceof Fault
+          ? e.code
+          : e instanceof ZodError
+            ? 'VALIDATION'
+            : status === 409
+              ? 'CONFLICT'
+              : status === 429
+                ? 'RATE_LIMIT'
+                : status >= 500
+                  ? 'INTERNAL_ERROR'
+                  : 'REQUEST_ERROR',
+      message:
+        e instanceof Fault
+          ? e.message
+          : e instanceof ZodError
+            ? 'Dữ liệu không hợp lệ'
+            : status === 409
+              ? 'Dữ liệu đã tồn tại hoặc vừa thay đổi'
+              : status === 429
+                ? 'Bạn đã thử quá nhiều lần. Vui lòng chờ một phút rồi thử lại.'
+                : status >= 500
+                  ? 'Không thể lưu. Vui lòng thử lại; nội dung chưa được xác nhận.'
+                  : 'Yêu cầu không hợp lệ',
+      field_errors: e instanceof ZodError ? e.issues : undefined,
+      request_id: req.id,
+      retryable: status >= 500 || status === 429,
+    });
   });
   app.post(
     '/api/v1/auth/login',
     { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
     async (req, reply) => {
       const b = z
-        .object({ email: z.email(), password: z.string().min(1).max(1024) })
+        .object({
+          username: z.string().trim().min(1).max(254).optional(),
+          email: z.email().optional(),
+          password: z.string().min(1).max(1024),
+        })
+        .refine((v) => !!(v.username || v.email), { message: 'Cần tên đăng nhập' })
         .parse(req.body);
       const result = await tx(async (c) => {
-        const u = await one(c, 'SELECT * FROM users WHERE lower(email)=lower($1)', [b.email]);
+        const u = await one(
+          c,
+          'SELECT * FROM users WHERE lower(username)=lower($1) OR lower(email)=lower($1)',
+          [b.username || b.email],
+        );
         const fallback =
           '$argon2id$v=19$m=65536,t=3,p=4$NkFwQW9HczY5Q1NsVjBsaQ$krCKWWOEZmKZ4HHurTTVR68EehftTWbTI9uOVllvZz4';
         let valid = false;
         try {
           valid = await verify(u?.password_hash || fallback, b.password);
         } catch {}
-        need(u?.active && valid, 'Email hoặc mật khẩu không đúng', 401, 'BAD_LOGIN');
+        need(u?.active && valid, 'Tên đăng nhập hoặc mật khẩu không đúng', 401, 'BAD_LOGIN');
         const token = randomBytes(32).toString('hex'),
           csrf = randomBytes(24).toString('hex');
         await c.query(
@@ -250,7 +257,13 @@ export async function buildApp() {
   });
   api('POST', '/auth/password', async (c, a, b) => {
     const v = z
-      .object({ current_password: z.string(), new_password: z.string().min(12).max(1024) })
+      .object({
+        current_password: z.string(),
+        new_password: z
+          .string()
+          .max(1024)
+          .refine((v) => Array.from(v).length >= 11, { message: 'Mật khẩu cần ít nhất 11 ký tự' }),
+      })
       .parse(b);
     const u = await one(c, 'SELECT password_hash FROM users WHERE id=$1', [a.id]);
     need(
@@ -287,7 +300,7 @@ export async function buildApp() {
     need(management(a));
     const users = await rows(
       c,
-      'SELECT id,email,name,active,team_id,manager_id,reviewer_id,permission_version FROM users ORDER BY name',
+      'SELECT id,username,email,name,active,team_id,manager_id,reviewer_id,permission_version FROM users ORDER BY name',
     );
     const out = [];
     for (const u of users)
@@ -318,9 +331,16 @@ export async function buildApp() {
     need(isAdmin(a));
     const v = z
       .object({
-        email: z.email(),
+        username: z
+          .string()
+          .trim()
+          .regex(/^[A-Za-z0-9_.-]{3,64}$/),
+        email: z.email().nullable().optional(),
         name: z.string().trim().min(1).max(120),
-        password: z.string().min(12).max(1024),
+        password: z
+          .string()
+          .max(1024)
+          .refine((v) => Array.from(v).length >= 11, { message: 'Mật khẩu cần ít nhất 11 ký tự' }),
         team_id: z.uuid().nullable(),
         manager_id: z.uuid().nullable().optional(),
         reviewer_id: z.uuid().nullable().optional(),
@@ -328,9 +348,10 @@ export async function buildApp() {
       .parse(b);
     const u = await one(
       c,
-      'INSERT INTO users(email,name,password_hash,team_id,manager_id,reviewer_id) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
+      'INSERT INTO users(username,email,name,password_hash,team_id,manager_id,reviewer_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
       [
-        v.email.toLowerCase(),
+        v.username.toLowerCase(),
+        v.email?.toLowerCase() || null,
         v.name,
         await passwordHash(v.password),
         v.team_id,
