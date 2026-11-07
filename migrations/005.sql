@@ -1,0 +1,15 @@
+CREATE TABLE task_templates(code text PRIMARY KEY,current_version int NOT NULL DEFAULT 1,enabled boolean NOT NULL DEFAULT true,updated_by uuid REFERENCES users,updated_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE task_template_versions(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),code text NOT NULL REFERENCES task_templates,version int NOT NULL CHECK(version>0),definition jsonb NOT NULL,created_by uuid REFERENCES users,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(code,version),CHECK(jsonb_typeof(definition)='object'));
+ALTER TABLE task_templates ADD CONSTRAINT template_current_version FOREIGN KEY(code,current_version) REFERENCES task_template_versions(code,version) DEFERRABLE INITIALLY DEFERRED;
+CREATE TABLE task_template_roles(code text NOT NULL REFERENCES task_templates,role text NOT NULL,PRIMARY KEY(code,role));
+CREATE TRIGGER immutable_task_template_versions BEFORE UPDATE OR DELETE ON task_template_versions FOR EACH ROW EXECUTE FUNCTION immutable_record();
+ALTER TABLE tasks ADD COLUMN template_version_id uuid REFERENCES task_template_versions;
+ALTER TABLE tasks ADD COLUMN template_snapshot jsonb NOT NULL DEFAULT '{}';
+CREATE TABLE task_comments(id bigserial PRIMARY KEY,task_id uuid NOT NULL REFERENCES tasks,author_id uuid NOT NULL REFERENCES users,body text NOT NULL CHECK(length(trim(body)) BETWEEN 1 AND 10000),created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX task_comments_thread ON task_comments(task_id,id);
+CREATE TRIGGER immutable_task_comments BEFORE UPDATE OR DELETE ON task_comments FOR EACH ROW EXECUTE FUNCTION immutable_record();
+CREATE TABLE task_updates(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),task_id uuid NOT NULL REFERENCES tasks,actor_id uuid REFERENCES users,summary text NOT NULL,next_step text NOT NULL DEFAULT '',blocker text NOT NULL DEFAULT '',created_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX task_updates_task ON task_updates(task_id,created_at DESC);
+CREATE TRIGGER immutable_task_updates BEFORE UPDATE OR DELETE ON task_updates FOR EACH ROW EXECUTE FUNCTION immutable_record();
+INSERT INTO task_updates(task_id,actor_id,summary,next_step,blocker,created_at) SELECT task_id,actor_id,coalesce(data->>'summary',''),coalesce(data->>'next_step',''),coalesce(data->>'blocker',''),created_at FROM task_events WHERE action='PROGRESS';
+CREATE TABLE staged_task_assets(id uuid PRIMARY KEY,uploaded_by uuid NOT NULL REFERENCES users,filename text NOT NULL,storage_key text NOT NULL UNIQUE,size bigint NOT NULL CHECK(size>0),sha256 text NOT NULL,mime text NOT NULL,shared boolean NOT NULL DEFAULT false,created_at timestamptz NOT NULL DEFAULT now());

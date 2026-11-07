@@ -13,6 +13,7 @@ import {
   type Actor,
 } from '../server/base.js';
 import { createUser, migrate, bootstrapAdmin } from '../server/cli.js';
+import { seedTemplateMigration, snapshotLegacyTasks } from '../server/template-store.js';
 import { buildApp } from '../server/app.js';
 import { runJobs } from '../server/worker.js';
 import { comparison } from '../server/reports.js';
@@ -87,6 +88,7 @@ before(async () => {
         list.map((t) => '"' + t.tablename + '"').join(',') +
         ' RESTART IDENTITY CASCADE',
     );
+    await seedTemplateMigration(c);
     await c.query(
       'INSERT INTO settings(key,value) VALUES(\'calendar\',\'{"holidays":[],"timezone":"Asia/Ho_Chi_Minh","version":1}\'),(\'policies\',\'{"assignment_boundary_confirmed":true,"report_week_confirmed":true,"deadline_reviewer_approval":true,"support_scope":"TEAM","birthday_policy_confirmed":false,"reopen_enabled":false}\')',
     );
@@ -599,6 +601,20 @@ test('AT-003,038,070 · role expiry immediately cuts task/report/support APIs du
   const r = await ok('employee', 'GET', '/report-revisions/' + firstRevision.id);
   assert.equal(r.snapshot.principal.length, 0);
   assert.equal(r.snapshot.narratives.length, 0);
+  assert.equal(
+    (
+      await request(
+        'employee',
+        'GET',
+        '/report-revisions/' + firstRevision.id + '/export?role=CONTENT',
+      )
+    ).status,
+    403,
+  );
+  assert.equal(
+    (await request('outside', 'GET', '/report-revisions/' + firstRevision.id + '/export')).status,
+    404,
+  );
   await pool.query('UPDATE grants SET valid_to=NULL WHERE user_id=ANY($1)', [
     [ids.employee, ids.support],
   ]);
@@ -869,8 +885,8 @@ test('Files · actual upload/download, checksum, safe name, private pending ACL,
   await pool.query('UPDATE grants SET valid_to=NULL WHERE user_id=$1', [ids.employee]);
 });
 test('AT-044..047 · actual CSV import, date/header mapping, total rows excluded, duplicate bytes, source retained, XLSX parser', async () => {
-  const bytes = Buffer.from(
-    'Date,GMV,Orders\n2026-10-20,1000,2\n2026-10-21,0,0\n2026-10-22,—,1\nTotal,1000,3\n',
+  const bytes = (await import('node:fs')).readFileSync(
+    'tests/fixtures/metrics/synthetic-tiktok-daily.csv',
   );
   const upload = await multipartRequest(
     'sales',
@@ -989,6 +1005,11 @@ test('AT-028..030 · authoritative report fixture has 3 total, 3 started, 1 done
         );
       }
     }
+  });
+  await tx(async (c) => {
+    await c.query(
+      "UPDATE tasks SET template_snapshot=(SELECT definition FROM task_template_versions WHERE code='OTHER' AND version=1) WHERE template_snapshot='{}'::jsonb",
+    );
   });
   const login = await app.inject({
     method: 'POST',
@@ -1293,6 +1314,289 @@ test('Username admin bootstrap accepts exactly 11 characters, hashes secret and 
     },
   });
   assert.equal(tooShort.statusCode, 422);
+});
+test('F01/F02 · catalog complete, strict configuration, versioned Admin edits preserve task snapshots', async () => {
+  const catalog = JSON.parse(
+    (await import('node:fs')).readFileSync('config/role_task_catalog.json', 'utf8'),
+  );
+  const list = await ok('admin', 'GET', '/admin/task-templates');
+  const mappings = catalog.roles || catalog;
+  const serialized = JSON.stringify(mappings);
+  assert(list.items.length >= 74);
+  for (const t of list.items) {
+    assert(t.definition.name);
+    assert(t.definition.group);
+    assert(t.version >= 1);
+    assert(t.roles.length);
+  }
+  assert(serialized.includes('LISTING_CREATE'));
+  for (const [role, codes] of Object.entries(mappings) as [string, string[]][])
+    for (const code of codes) {
+      const template = list.items.find((t: any) => t.code === code);
+      assert(template, code);
+      assert(template.roles.includes(role), role + ':' + code);
+    }
+  const sales = await ok('sales', 'GET', '/task-types');
+  assert.notEqual(sales.items.find((t: any) => t.code === 'LISTING_CREATE').name, 'LISTING_CREATE');
+  assert.equal((await request('employee', 'GET', '/admin/task-templates')).status, 403);
+  const def = {
+    code: 'REGRESSION_TEMPLATE',
+    name: 'Mẫu kiểm thử tiếng Việt',
+    group: 'Kiểm thử',
+    enabled: true,
+    roles: ['CONTENT'],
+    fields: [],
+    checkpoints: [],
+    output_policy: 'TEXT_OR_ARTIFACT',
+    reason: 'Kiểm thử phiên bản',
+  };
+  await ok('admin', 'POST', '/admin/task-templates', def);
+  let old = await ok('employee', 'POST', '/tasks', {
+    title: 'Snapshot không đổi',
+    type: def.code,
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  await ok('admin', 'POST', '/admin/task-templates/' + def.code + '/versions', {
+    ...def,
+    name: 'Tên mới',
+    enabled: false,
+    fields: [
+      {
+        key: 'proof',
+        label: 'Bằng chứng',
+        type: 'string',
+        phase: 'SUBMIT',
+        required_at_action: true,
+      },
+    ],
+    expected_version: 1,
+  });
+  const unchanged = await ok('employee', 'GET', '/tasks/' + old.id);
+  assert.deepEqual(unchanged.template_snapshot, old.template_snapshot);
+  assert.equal(unchanged.version, old.version);
+  assert.equal(unchanged.template_name, def.name);
+  for (const type of [def.code, 'MISSING_TEMPLATE']) {
+    const r = await request('employee', 'POST', '/tasks', {
+      title: 'Cấu hình thiếu',
+      type,
+      due_at: new Date().toISOString(),
+    });
+    assert.equal(r.status, 422);
+    assert.equal(r.data.code, 'TEMPLATE_CONFIG_REQUIRED');
+  }
+  assert.equal(
+    (
+      await request('admin', 'POST', '/admin/task-templates/' + def.code + '/versions', {
+        ...def,
+        expected_version: 1,
+      })
+    ).status,
+    409,
+  );
+  assert.equal((await request('employee', 'POST', '/admin/task-templates', def)).status, 403);
+});
+test('F01/F02 migration · legacy fallback is explicit and preserves task data', async () => {
+  await tx(async (c) => {
+    const legacy = await one(
+      c,
+      "INSERT INTO tasks(title,owner_id,created_by,role,type,status,source,payload,due_at) VALUES('Lịch sử trước registry',$1,$1,'MARKETPLACE','LISTING_CREATE','IN_PROGRESS','EMPLOYEE_ADHOC','{\"old_field\":\"giữ nguyên\"}',now()) RETURNING *",
+      [ids.sales],
+    );
+    await snapshotLegacyTasks(c);
+    const migrated = await one(c, 'SELECT * FROM tasks WHERE id=$1', [legacy.id]);
+    assert.equal(migrated.template_snapshot.legacy_contract, 'OTHER_V1_USED_BEFORE_REGISTRY');
+    assert.equal(migrated.template_snapshot.code, 'LISTING_CREATE');
+    assert.notEqual(migrated.template_snapshot.name, 'LISTING_CREATE');
+    for (const key of ['id', 'title', 'status', 'payload', 'version', 'created_at', 'due_at'])
+      assert.deepEqual(migrated[key], legacy[key]);
+    await snapshotLegacyTasks(c);
+    assert.deepEqual(
+      (await one(c, 'SELECT * FROM tasks WHERE id=$1', [legacy.id])).template_snapshot,
+      migrated.template_snapshot,
+    );
+  });
+});
+test('F03/F04/F06 · staged file private, creation atomic, unified update and comments respect permissions', async () => {
+  const uploaded = await multipartRequest(
+    'employee',
+    '/task-attachments',
+    {},
+    'creation.txt',
+    Buffer.from('creation evidence'),
+  );
+  assert.equal(uploaded.statusCode, 200, uploaded.body);
+  const file = uploaded.json();
+  assert.equal((await request('employee', 'GET', '/assets/' + file.id + '/download')).status, 404);
+  const common = {
+    title: 'Việc gọn kèm tệp',
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+    attachment_ids: [file.id],
+    share_attachments: true,
+  };
+  assert.equal((await request('support', 'POST', '/tasks', common)).status, 422);
+  let t = await ok('employee', 'POST', '/tasks', {
+    ...common,
+    supporters: [{ user_id: ids.support, role: 'DESIGNER' }],
+  });
+  t = await ok('employee', 'GET', '/tasks/' + t.id);
+  assert.equal(t.role, 'CONTENT');
+  assert.equal(t.assets[0].shared, true);
+  assert.equal(t.checkpoints.length, 0);
+  assert.equal((await request('support', 'GET', '/tasks/' + t.id + '/comments')).status, 403);
+  assert.equal((await request('outside', 'GET', '/tasks/' + t.id + '/comments')).status, 404);
+  const key = randomUUID();
+  const msg = { body: '<script>alert(1)</script> Trao đổi người dùng' };
+  const both = await Promise.all([
+    ok('employee', 'POST', '/tasks/' + t.id + '/comments', msg, key),
+    ok('employee', 'POST', '/tasks/' + t.id + '/comments', msg, key),
+  ]);
+  assert.equal(both[0].id, both[1].id);
+  const thread = await ok('manager', 'GET', '/tasks/' + t.id + '/comments');
+  assert.equal(thread.items.length, 1);
+  assert.equal(thread.items[0].body, msg.body);
+  const rejected = await request('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    state: 'SUBMITTED',
+    summary: '',
+    next_step: 'must rollback',
+    expected_version: t.version,
+  });
+  assert.equal(rejected.status, 422);
+  assert.equal((await ok('employee', 'GET', '/tasks/' + t.id)).version, t.version);
+  t = await ok('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    state: 'IN_PROGRESS',
+    summary: 'Tiến độ mới',
+    expected_version: t.version,
+  });
+  assert.equal(t.status, 'IN_PROGRESS');
+  assert.equal(t.updates[0].summary, 'Tiến độ mới');
+  const stale = await request('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    state: 'SUBMITTED',
+    summary: 'Kết quả',
+    expected_version: t.version - 1,
+  });
+  assert.equal(stale.status, 409);
+  t = await ok('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    state: 'SUBMITTED',
+    summary: 'Đã xong',
+    expected_version: t.version,
+  });
+  assert.equal(t.status, 'SUBMITTED');
+  await pool.query(
+    "UPDATE grants SET valid_to=now()-interval '1 second' WHERE user_id=$1 AND kind='JOB'",
+    [ids.employee],
+  );
+  assert.equal((await request('employee', 'GET', '/tasks/' + t.id + '/comments')).status, 404);
+  assert.equal((await request('employee', 'GET', '/assets/' + file.id + '/download')).status, 404);
+  const me = await ok('employee', 'GET', '/me');
+  assert.equal(me.capabilities.create_task, false);
+  await pool.query('UPDATE grants SET valid_to=NULL WHERE user_id=$1', [ids.employee]);
+});
+test('F11 · submitted report remains immutable and discoverable after ownership transfer', async () => {
+  let t = await ok('employee', 'POST', '/tasks', {
+    title: 'Lưu lịch sử người phụ trách',
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  const live = await ok('employee', 'GET', '/reports/live?period=' + period());
+  const rev = await ok('employee', 'POST', '/reports/submit', {
+    period: period(),
+    expected_draft_versions: Object.fromEntries(
+      live.narratives.map((n: any) => [n.role, n.version]),
+    ),
+  });
+  const before = await ok('manager', 'GET', '/report-revisions/' + rev.id);
+  assert(before.snapshot.principal.some((v: any) => v.id === t.id));
+  await ok('manager', 'POST', '/tasks/' + t.id + '/transfer', {
+    owner_id: ids.decline,
+    role: 'DESIGNER',
+    reason: 'Chuyển để kiểm thử lịch sử',
+    expected_version: t.version,
+  });
+  assert.deepEqual(
+    (await ok('manager', 'GET', '/report-revisions/' + rev.id)).snapshot,
+    before.snapshot,
+  );
+  const submitted = await ok('manager', 'GET', '/reports/submitted?period=' + period());
+  assert(
+    submitted.items
+      .find((v: any) => v.id === ids.employee)
+      .revisions.some((v: any) => v.id === rev.id),
+  );
+});
+
+test('F12 synthetic · overview/daily and period unique stay separate without attribution totals', async () => {
+  const base = {
+    platform: 'SHOPEE',
+    shop: 'SYNTHETIC_GRAIN',
+    kind: 'SALES',
+    subject: 'SHOP',
+    currency: 'VND',
+    source: 'synthetic regression only',
+    missing_reason: null,
+  };
+  for (const row of [
+    {
+      metric: 'gmv',
+      aggregation: 'SUM',
+      grain: 'DAY',
+      business_date: '2026-10-01',
+      window_end: '2026-10-01',
+      value: '100',
+    },
+    {
+      metric: 'gmv',
+      aggregation: 'SUM',
+      grain: 'DAY',
+      business_date: '2026-10-02',
+      window_end: '2026-10-02',
+      value: '150',
+    },
+    {
+      metric: 'gmv',
+      aggregation: 'SUM',
+      grain: 'PERIOD',
+      business_date: '2026-10-01',
+      window_end: '2026-10-02',
+      value: '250',
+    },
+    {
+      metric: 'visitors',
+      aggregation: 'PERIOD_UNIQUE',
+      grain: 'DAY',
+      business_date: '2026-10-01',
+      window_end: '2026-10-01',
+      value: '10',
+    },
+    {
+      metric: 'visitors',
+      aggregation: 'PERIOD_UNIQUE',
+      grain: 'DAY',
+      business_date: '2026-10-02',
+      window_end: '2026-10-02',
+      value: '10',
+    },
+    {
+      metric: 'visitors',
+      aggregation: 'PERIOD_UNIQUE',
+      grain: 'PERIOD',
+      business_date: '2026-10-01',
+      window_end: '2026-10-02',
+      value: '15',
+    },
+  ])
+    await ok('sales', 'POST', '/metrics', { ...base, ...row });
+  const data = await ok('sales', 'GET', '/metrics?kind=SALES');
+  const records = data.items.filter((r: any) => r.shop === base.shop);
+  assert.equal(records.length, 6);
+  assert(records.every((r: any) => r.subject === 'SHOP' && r.kind === 'SALES'));
+  assert.equal(records.filter((r: any) => r.metric === 'gmv' && r.grain === 'PERIOD').length, 1);
+  assert.equal(
+    Number(records.find((r: any) => r.metric === 'visitors' && r.grain === 'PERIOD').value),
+    15,
+  );
+  assert.equal(data.definitions.visitors, 'PERIOD_UNIQUE');
+  assert.equal(data.total_gmv, undefined);
+  assert.equal(data.employee_gmv, undefined);
+  assert.equal((await request('sales', 'GET', '/metrics?kind=VIDEO')).status, 403);
 });
 test('Disabled account/session and logout deny subsequent API', async () => {
   await pool.query('UPDATE users SET active=false WHERE id=$1', [ids.outside]);

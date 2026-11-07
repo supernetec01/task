@@ -25,6 +25,7 @@ import {
   access,
   version,
   management,
+  manages,
   scopeUser,
   setting,
   notify,
@@ -32,6 +33,7 @@ import {
 import { taskRoutes } from './tasks.js';
 import { reportRoutes } from './reports.js';
 import { moduleRoutes } from './modules.js';
+import { capabilities } from './capabilities.js';
 import { logStream } from './logging.js';
 export type Handler = (
   c: DB,
@@ -247,6 +249,7 @@ export async function buildApp() {
     ...a,
     admin: isAdmin(a),
     management: management(a),
+    capabilities: await capabilities(c, a),
     policies: await setting(c, 'policies'),
     demo: process.env.DEMO_MODE === 'true',
   }));
@@ -285,14 +288,26 @@ export async function buildApp() {
     const policy = await setting(c, 'policies');
     const result = [];
     for (const u of users) {
-      if (u.id !== a.id && !isAdmin(a) && policy.support_scope !== 'ALL' && u.team_id !== a.team_id)
+      if (
+        u.id !== a.id &&
+        !isAdmin(a) &&
+        !manages(a, u) &&
+        policy.support_scope !== 'ALL' &&
+        u.team_id !== a.team_id
+      )
         continue;
       const roles = await rows(
         c,
         "SELECT DISTINCT role FROM grants WHERE user_id=$1 AND kind='JOB' AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now())",
         [u.id],
       );
-      result.push({ ...u, roles: roles.map((r) => r.role) });
+      result.push({
+        ...u,
+        roles: roles.map((r) => r.role),
+        assignment_eligible: u.id === a.id || manages(a, u),
+        invitation_eligible:
+          isAdmin(a) || policy.support_scope === 'ALL' || u.team_id === a.team_id,
+      });
     }
     return { items: result };
   });

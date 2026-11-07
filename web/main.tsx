@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppErrorBoundary } from './error-boundary';
 import { api, setCsrf } from './api';
@@ -17,6 +17,7 @@ import { TaskTable, TaskDetail, CreateTask } from './tasks';
 import { Reports, Plans, Summary } from './reports';
 import { Team, Settings, Accounts } from './admin';
 import { Records, Requests } from './modules';
+import { TemplateAdmin } from './template-admin';
 import { Metrics, Claims } from './business';
 import './style.css';
 const names: Record<string, string> = {
@@ -35,6 +36,7 @@ const names: Record<string, string> = {
   accounts: 'Tài khoản nền tảng',
   users: 'Đội ngũ & phân quyền',
   settings: 'Thiết lập',
+  templates: 'Mẫu công việc',
   notifications: 'Thông báo',
   profile: 'Tài khoản của tôi',
   audit: 'Nhật ký thay đổi',
@@ -51,10 +53,22 @@ function App() {
     [revision, setRevision] = useState(0),
     [sub, setSub] = useState(''),
     [filter, setFilter] = useState('');
+  const permissionKey = useRef('');
+  const [accessRevision, setAccessRevision] = useState(0);
   const loadMe = async () => {
     try {
       const u = await api('/me');
       setCsrf(u.csrf);
+      const next = JSON.stringify([u.permission_version, u.grants, u.capabilities]);
+      if (permissionKey.current && permissionKey.current !== next) {
+        setTask('');
+        setCreate(false);
+        setSub('');
+        setFilter('');
+        setAccessRevision((r) => r + 1);
+        setRevision((r) => r + 1);
+      }
+      permissionKey.current = next;
       setMe(u);
       setError(null);
     } catch (e) {
@@ -67,30 +81,29 @@ function App() {
   useEffect(() => {
     loadMe();
     const timer = setInterval(loadMe, 60000);
-    return () => clearInterval(timer);
+    const refresh = () => {
+      void loadMe();
+    };
+    window.addEventListener('sn-access-refresh', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('sn-access-refresh', refresh);
+    };
   }, []);
-  const jobs = me?.grants.filter((g: any) => g.kind === 'JOB').map((g: any) => g.role) || [],
-    has = (...roles: string[]) => me?.admin || roles.some((r) => jobs.includes(r));
-  let nav = [
-    'dashboard',
-    'mine',
-    ...(me?.management ? ['team'] : []),
-    'plans',
-    'reports',
-    ...(has('CONTENT', 'DESIGNER') ? ['content'] : []),
-    ...(has('MARKETPLACE') ? ['business'] : []),
-    ...(has('ADS') ? ['ads'] : []),
-    ...(has('HR') ? ['hr'] : []),
-    ...(has('WAREHOUSE') ? ['warehouse'] : []),
-    ...(has('ACCOUNTANT') ? ['finance'] : []),
-    ...(has('TESTER_OPTIONAL') ? ['issues'] : []),
-    'requests',
-    'accounts',
-    ...(me?.management ? ['users'] : []),
-    ...(me?.admin ? ['settings', 'audit'] : []),
-    'profile',
-  ];
-  const current = nav.includes(page) || page === 'notifications' ? page : 'dashboard';
+  const groups: { id: string; label: string; items: string[] }[] =
+    me?.capabilities?.menu_groups || [];
+  const nav = groups.flatMap((g) => g.items);
+  const current = nav.includes(page) || page === 'notifications' ? page : nav[0] || 'profile';
+  useEffect(() => {
+    if (!me) return;
+    const expiry = me.grants
+      .map((g: any) => Date.parse(g.valid_to))
+      .filter((v: number) => v > Date.now())
+      .sort((a: number, b: number) => a - b)[0];
+    if (!expiry) return;
+    const timer = setTimeout(loadMe, Math.min(expiry - Date.now() + 50, 2147483647));
+    return () => clearTimeout(timer);
+  }, [me]);
   const go = (v: string) => {
     setPage(v);
     setOpen(false);
@@ -137,39 +150,27 @@ function App() {
           </div>
         </div>
         <div className="nav">
-          {nav.map((n, i) => (
-            <React.Fragment key={n}>
-              {[0, 5, nav.indexOf('requests'), nav.indexOf('users')].includes(i) && (
-                <div className="nav-heading">
-                  {i === 0
-                    ? 'CÔNG VIỆC'
-                    : n === 'requests'
-                      ? 'ĐỀ NGHỊ & TÀI KHOẢN'
-                      : n === 'users'
-                        ? 'QUẢN TRỊ'
-                        : 'CHUYÊN MÔN'}
-                </div>
-              )}
-              <button className={current === n ? 'active' : ''} onClick={() => go(n)}>
-                <span className="nav-icon" aria-hidden="true">
-                  {{
-                    dashboard: '▦',
-                    mine: '☑',
-                    team: '♧',
-                    plans: '▤',
-                    reports: '▥',
-                    content: '◈',
-                    business: '↗',
-                    ads: '◎',
-                    hr: '♧',
-                    warehouse: '▧',
-                    requests: '▱',
-                    accounts: '⌘',
-                    settings: '⚙',
-                  }[n] || '◇'}
-                </span>
-                {names[n]}
-              </button>
+          {groups.map((group) => (
+            <React.Fragment key={group.id}>
+              <div className="nav-heading">{group.label}</div>
+              {group.items.map((n) => (
+                <button key={n} className={current === n ? 'active' : ''} onClick={() => go(n)}>
+                  <span className="nav-icon" aria-hidden="true">
+                    {(
+                      {
+                        dashboard: '▦',
+                        mine: '☑',
+                        team: '♧',
+                        plans: '▤',
+                        reports: '▥',
+                        templates: '▤',
+                        settings: '⚙',
+                      } as Record<string, string>
+                    )[n] || '◇'}
+                  </span>
+                  {names[n]}
+                </button>
+              ))}
             </React.Fragment>
           ))}
         </div>
@@ -211,13 +212,13 @@ function App() {
             <span className="avatar">{me.name.slice(0, 1)}</span>
           </div>
         </header>
-        <div className="content">
+        <div className="content" key={accessRevision}>
           <div className="heading">
             <div>
               <div className="eyebrow">SUPER NET WORKSPACE</div>
               <h1>{names[current]}</h1>
             </div>
-            {['dashboard', 'mine', 'team'].includes(current) && jobs.length > 0 && (
+            {['dashboard', 'mine', 'team'].includes(current) && me.capabilities.create_task && (
               <button className="primary" onClick={() => setCreate(true)}>
                 + {me.management ? 'Giao nhiệm vụ' : 'Thêm việc phát sinh'}
               </button>
@@ -277,6 +278,7 @@ function App() {
             </>
           )}
           {current === 'requests' && <Requests me={me} />} {current === 'users' && <Team me={me} />}{' '}
+          {current === 'templates' && <TemplateAdmin />}
           {current === 'settings' && <Settings />} {current === 'accounts' && <Accounts me={me} />}{' '}
           {current === 'notifications' && <Notifications />} {current === 'audit' && <Audit />}{' '}
           {current === 'profile' && (

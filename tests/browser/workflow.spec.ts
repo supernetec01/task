@@ -47,14 +47,14 @@ test('Production UI: manager assigns → employee accepts/submits → manager re
   await page.getByRole('button', { name: title, exact: true }).click();
   await dialog.getByRole('button', { name: 'Nhận việc', exact: true }).click();
   await expect(dialog.getByText('Đã nhận', { exact: true })).toBeVisible();
-  await dialog.getByRole('button', { name: 'Bắt đầu thực hiện', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Thực hiện', exact: true }).click();
-  await dialog.getByLabel('Tiến độ / việc đã thực hiện').fill('Đã hoàn thành');
+  await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
+  await dialog.getByLabel('Nội dung cập nhật / kết quả').fill('Đã hoàn thành');
   await dialog.getByLabel('Bước tiếp theo', { exact: true }).fill('Nộp kết quả');
-  await dialog.getByRole('button', { name: 'Cập nhật tiến độ', exact: true }).click();
-  await dialog.getByRole('button', { name: 'Nộp kết quả', exact: true }).click();
-  await dialog.getByLabel('Kết quả công việc').fill('Kết quả E2E có dữ liệu thật');
-  await dialog.getByRole('button', { name: 'Nộp cho người duyệt', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Lưu cập nhật', exact: true }).click();
+  await expect(dialog.getByText('Đã lưu cập nhật công việc.', { exact: true })).toBeVisible();
+  await dialog.getByLabel('Tình trạng cập nhật').selectOption('SUBMITTED');
+  await dialog.getByLabel('Nội dung cập nhật / kết quả').fill('Kết quả E2E có dữ liệu thật');
+  await dialog.getByRole('button', { name: 'Lưu cập nhật', exact: true }).click();
   await expect(dialog.getByText('Chờ duyệt', { exact: true })).toBeVisible();
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
   await logout(page);
@@ -62,7 +62,7 @@ test('Production UI: manager assigns → employee accepts/submits → manager re
   await nav(page, 'Công việc nhóm');
   await page.getByLabel('Tìm task').fill(title);
   await page.getByRole('button', { name: title, exact: true }).click();
-  await dialog.getByRole('button', { name: 'Nộp kết quả', exact: true }).click();
+  await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
   await dialog.getByLabel('Quyết định', { exact: true }).selectOption('APPROVE');
   await dialog.getByLabel('Nhận xét').fill('Đạt yêu cầu');
   await dialog.getByRole('button', { name: 'Xác nhận quyết định', exact: true }).click();
@@ -140,6 +140,27 @@ test('Offline save preserves task draft, retries the same key, closing asks befo
   page.once('dialog', (d) => d.accept());
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
   await expect(dialog).not.toBeVisible();
+  // Specialized fields and ordinary update fields share one preserved form value.
+  await page.getByRole('button', { name: '+ Thêm việc phát sinh', exact: true }).click();
+  await dialog.getByLabel('Tên nhiệm vụ').fill('Kịch bản có thông tin chuyên môn');
+  await dialog.getByLabel('Thời hạn').fill('2030-11-10T17:00');
+  await dialog.locator('summary').filter({ hasText: 'Chọn mẫu công việc' }).click();
+  await dialog.getByLabel('Mẫu công việc', { exact: true }).selectOption('SCRIPT');
+  await page.unroute('**/api/v1/tasks');
+  await dialog.getByRole('button', { name: 'Lưu công việc', exact: true }).click();
+  await expect(
+    dialog.getByRole('heading', { name: /Kịch bản có thông tin chuyên môn/ }),
+  ).toBeVisible();
+  await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
+  await dialog.locator('summary').filter({ hasText: 'Thông tin chuyên môn' }).click();
+  await dialog.getByLabel('Mục tiêu', { exact: true }).fill('Mục tiêu được lưu');
+  await dialog.getByLabel('Câu mở đầu', { exact: true }).fill('Câu mở đầu được lưu');
+  await dialog.getByLabel('Nội dung cập nhật / kết quả').fill('Tiến độ cùng payload');
+  await dialog.getByRole('button', { name: 'Lưu cập nhật', exact: true }).click();
+  await expect(dialog.getByText('Đã lưu cập nhật công việc.', { exact: true })).toBeVisible();
+  await dialog.locator('summary').filter({ hasText: 'Thông tin chuyên môn' }).click();
+  await expect(dialog.getByLabel('Mục tiêu', { exact: true })).toHaveValue('Mục tiêu được lưu');
+  await expect(dialog.getByLabel('Câu mở đầu', { exact: true })).toHaveValue('Câu mở đầu được lưu');
 });
 test('Support invitation can be accepted and contribution saved on desktop/mobile without completing the task', async ({
   page,
@@ -157,9 +178,47 @@ test('Support invitation can be accepted and contribution saved on desktop/mobil
     await expect(dialog).not.toBeVisible();
     await page.getByRole('button', { name: 'File persistence task', exact: true }).click();
   }
+  await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
   await dialog.getByLabel('Phần hỗ trợ của tôi').fill('Contribution qua browser');
   await dialog.getByLabel('Đã hoàn thành phần hỗ trợ').check();
   await dialog.getByRole('button', { name: 'Lưu', exact: true }).click();
   await expect(dialog.getByText('Chờ nhận', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+test('F02/F10 · Admin edits a versioned template; permission refresh clears the open page', async ({
+  page,
+}, info) => {
+  await login(page, 'admin');
+  await nav(page, 'Mẫu công việc');
+  await page.getByLabel('Tìm mẫu công việc').fill('Tạo sản phẩm');
+  // Search by the stored human label rather than a raw catalog code.
+  await page.getByLabel('Tìm mẫu công việc').fill('');
+  const row = page.locator('tbody tr').filter({ hasText: 'LISTING_CREATE' });
+  await row.getByRole('button', { name: 'Chỉnh sửa mẫu', exact: true }).click();
+  const modal = page.getByRole('dialog');
+  const label = 'Tạo sản phẩm trên sàn · ' + info.project.name;
+  await modal.getByLabel('Tên mẫu tiếng Việt').fill(label);
+  await modal.getByLabel('Lý do thay đổi / người chốt').fill('Kiểm thử quản trị mẫu');
+  await modal.getByRole('button', { name: 'Lưu phiên bản mới', exact: true }).click();
+  await expect(modal).not.toBeVisible();
+  await expect(row).toContainText(label);
+  const me = await page.evaluate(async () => (await fetch('/api/v1/me')).json());
+  await page.route('**/api/v1/me', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        ...me,
+        permission_version: me.permission_version + 1,
+        grants: [],
+        capabilities: {
+          create_task: false,
+          menu_groups: [{ id: 'administration', label: 'Quản trị', items: ['profile'] }],
+        },
+      }),
+    }),
+  );
+  await page.evaluate(() => window.dispatchEvent(new Event('sn-access-refresh')));
+  await expect(page.getByRole('heading', { name: 'Tài khoản của tôi', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Tìm mẫu công việc')).toHaveCount(0);
 });

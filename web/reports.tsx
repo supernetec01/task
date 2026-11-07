@@ -165,6 +165,11 @@ export function Reports({ me, onTask }: { me: any; onTask: (id: string) => void 
                   )}
                 </div>
               </div>
+              <div className="notice">
+                {mode === 'own'
+                  ? 'Bản xem trước theo người phụ trách và trạng thái hiện tại tại thời điểm tải. Chọn tuần cũ không khôi phục trạng thái ở cuối tuần đó.'
+                  : 'Bản đã nộp được giữ nguyên tại thời điểm nộp. Chuyển người phụ trách hoặc cập nhật công việc sau đó không sửa nội dung bản này.'}
+              </div>
               {!snap.policy_confirmed && (
                 <div className="notice">
                   Chính sách tuần đang là đề xuất T2–CN, task phát sinh theo ngày tạo. Quản trị cần

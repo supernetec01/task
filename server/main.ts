@@ -10,6 +10,10 @@ async function start() {
     "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='username'",
   );
   if (!schema.rowCount) throw Error('MIGRATION_REQUIRED');
+  const templates = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='tasks' AND column_name='template_snapshot'",
+  );
+  if (!templates.rowCount) throw Error('MIGRATION_REQUIRED');
   const app = await buildApp();
   await app.listen({ host, port });
   console.log(`Super Net is running on ${host}:${port}`);

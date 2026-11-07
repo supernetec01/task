@@ -1,7 +1,1620 @@
 {
-  "format": "SuperNet phase form config v1",
-  "note": "Đây là UI/form config có kiểu, chưa phải JSON Schema standard. Codex viết adapter/JSON Schema validator; không đưa nguyên config này vào validator rồi tưởng được kiểm đầy đủ.",
+  "format": "SuperNet versioned task template seeds v2",
+  "note": "Seed once through migration 005. Runtime templates are managed in PostgreSQL; all catalog codes have explicit definitions. No runtime OTHER fallback.",
   "templates": [
+    {
+      "code": "ADVANCE_SETTLEMENT",
+      "name": "Quyết toán tạm ứng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "AD_ANALYSIS",
+      "name": "Phân tích hiệu quả quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_CREATIVE_REVIEW",
+      "name": "Kiểm tra nội dung quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_IMPORT",
+      "name": "Nhập báo cáo quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_MONITOR",
+      "name": "Theo dõi ngân sách và hiệu quả",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_OPTIMIZE",
+      "name": "Tối ưu quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_PLAN",
+      "name": "Lập kế hoạch quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "AD_SETUP_RECORD",
+      "name": "Ghi nhận thiết lập quảng cáo",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Quảng cáo",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ADS"
+      ]
+    },
+    {
+      "code": "ASSET_ORGANIZE",
+      "name": "Sắp xếp tài nguyên",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "AUDIENCE_RESEARCH",
+      "name": "Nghiên cứu khách hàng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "BANNER",
+      "name": "Thiết kế banner",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Thiết kế",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "DESIGNER"
+      ]
+    },
+    {
+      "code": "BIGSELLER_RECONCILE",
+      "name": "Đối chiếu dữ liệu BigSeller",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kho & thiết bị",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "WAREHOUSE"
+      ]
+    },
+    {
+      "code": "BRAND_GUIDE",
+      "name": "Hướng dẫn thương hiệu",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "BUG_REPRODUCE",
+      "name": "Tái hiện lỗi",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kiểm thử",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "TESTER_OPTIONAL"
+      ]
+    },
+    {
+      "code": "CANDIDATE_INTAKE",
+      "name": "Tiếp nhận ứng viên",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "COMMUNITY",
+      "name": "Chăm sóc cộng đồng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "COMPENSATION_ENTRY",
+      "name": "Nhập bồi hoàn",
+      "fields": [
+        {
+          "key": "channel_id",
+          "label": "Shop",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "order_id",
+          "label": "ID đơn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "sku_lines",
+          "label": "SKU",
+          "type": "array",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "reported_amount",
+          "label": "Số tiền",
+          "type": "decimal",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "currency",
+          "label": "Đơn vị tiền",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "required": [
+          "channel_id",
+          "order_id",
+          "reported_amount",
+          "currency"
+        ],
+        "amount_stage": "Q15 chưa chốt không mặc định RECEIVED"
+      },
+      "checkpoints": [
+        "Thông tin đơn",
+        "Nhập số tiền",
+        "Kiểm dữ liệu"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "COMPETITOR_RESEARCH",
+      "name": "Phân tích đối thủ",
+      "fields": [
+        {
+          "key": "competitors",
+          "label": "Đối thủ",
+          "type": "array",
+          "phase": "WORK",
+          "required_at_action": false,
+          "items": {
+            "name": "string",
+            "url": "url",
+            "observed_at": "date",
+            "price": "decimal_nullable",
+            "strengths": "string",
+            "weaknesses": "string"
+          }
+        },
+        {
+          "key": "comparison",
+          "label": "So sánh",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "recommendations",
+          "label": "Đề xuất",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "any_of": [
+          "comparison",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "checkpoints": [
+        "Chọn đối thủ",
+        "Quan sát và dẫn nguồn",
+        "So sánh",
+        "Kết luận"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "CONTENT_INCIDENT",
+      "name": "Xử lý sự cố nội dung",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "CONTENT_PLAN",
+      "name": "Lập kế hoạch nội dung",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "COPY",
+      "name": "Viết bài và nội dung chữ",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "DESIGN",
+      "name": "Thiết kế",
+      "fields": [
+        {
+          "key": "brief",
+          "label": "Yêu cầu",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "dimensions",
+          "label": "Kích thước",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "copy",
+          "label": "Nội dung chữ",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "brand_assets",
+          "label": "Tài nguyên",
+          "type": "reference_array",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "design_output",
+          "label": "Bản thiết kế",
+          "type": "reference_array",
+          "phase": "SUBMIT",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "any_of": [
+          "design_ready_asset_id",
+          "design_valid_url"
+        ]
+      },
+      "checkpoints": [
+        "Brief",
+        "Thiết kế",
+        "Nộp",
+        "Sửa/bàn giao"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Thiết kế",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "DESIGNER"
+      ]
+    },
+    {
+      "code": "DESIGN_BRIEF",
+      "name": "Lập yêu cầu thiết kế",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "DOCUMENT_CHECK",
+      "name": "Kiểm tra chứng từ",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "EDIT",
+      "name": "Dựng video",
+      "fields": [
+        {
+          "key": "source_assets",
+          "label": "Tư liệu đầu vào",
+          "type": "reference_array",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "edit_notes",
+          "label": "Yêu cầu dựng",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "duration_seconds",
+          "label": "Thời lượng",
+          "type": "decimal",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "subtitle_asset",
+          "label": "Phụ đề",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "cover_asset",
+          "label": "Ảnh bìa",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "any_of": [
+          "video_ready_asset_id",
+          "video_valid_url"
+        ],
+        "conditional_requirements": "duration/subtitle/cover chỉ bắt nếu brief yêu cầu"
+      },
+      "checkpoints": [
+        "Nhận tư liệu",
+        "Rough cut",
+        "Kiểm âm/phụ đề",
+        "Nộp bản xem",
+        "Sửa",
+        "Bàn giao"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "EMPLOYEE_OFFBOARD",
+      "name": "Bàn giao nhân viên nghỉ việc",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "EMPLOYEE_ONBOARD",
+      "name": "Tiếp nhận nhân viên",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "EQUIPMENT_HANDOVER",
+      "name": "Bàn giao thiết bị",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kho & thiết bị",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "WAREHOUSE"
+      ]
+    },
+    {
+      "code": "FEATURE_REVIEW",
+      "name": "Kiểm thử tính năng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kiểm thử",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "TESTER_OPTIONAL"
+      ]
+    },
+    {
+      "code": "HR_EVENT_CHECK",
+      "name": "Kiểm tra sự kiện nhân sự",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "HR_PROFILE_UPDATE",
+      "name": "Cập nhật hồ sơ nhân sự",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "IDEA",
+      "name": "Phát triển ý tưởng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "INTERVIEW_SCHEDULE",
+      "name": "Sắp xếp phỏng vấn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nhân sự",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "HR"
+      ]
+    },
+    {
+      "code": "KOC_BOOKING",
+      "name": "Liên hệ hợp tác KOC",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "KOC_BRIEF",
+      "name": "Chuẩn bị yêu cầu cho KOC",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "KOC_FOLLOWUP",
+      "name": "Theo dõi hợp tác KOC",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "LEARNING",
+      "name": "Học tập chuyên môn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Thực tập",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "INTERN"
+      ]
+    },
+    {
+      "code": "LISTING_AUDIT",
+      "name": "Kiểm tra thông tin sản phẩm trên sàn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "LISTING_CREATE",
+      "name": "Đăng sản phẩm mới trên sàn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "LISTING_UPDATE",
+      "name": "Cập nhật sản phẩm trên sàn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "LIVE_PREP",
+      "name": "Chuẩn bị livestream",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "LIVE_SESSION",
+      "name": "Thực hiện livestream",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "LOCALIZE",
+      "name": "Biên dịch và bản địa hóa",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "MEASURE",
+      "name": "Đo hiệu quả",
+      "fields": [
+        {
+          "key": "subject_id",
+          "label": "Bài đăng hoặc live",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "window_start",
+          "label": "Từ ngày",
+          "type": "date",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "window_end",
+          "label": "Đến ngày",
+          "type": "date",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "source",
+          "label": "Nguồn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "metrics",
+          "label": "Các chỉ số",
+          "type": "metric_array",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "required": [
+          "subject_id",
+          "window_start",
+          "window_end",
+          "source"
+        ],
+        "missing_allowed_with_reason": true
+      },
+      "checkpoints": [
+        "Chọn kỳ/nguồn",
+        "Nhập hoặc import",
+        "Kiểm dữ liệu",
+        "Phân tích"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "MENTOR_REVIEW",
+      "name": "Hướng dẫn và nhận xét thực tập",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Thực tập",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "INTERN"
+      ]
+    },
+    {
+      "code": "OPTIMIZE",
+      "name": "Tối ưu nội dung",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "ORDER_CASE",
+      "name": "Xử lý vấn đề đơn hàng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
     {
       "code": "OTHER",
       "name": "Công việc khác",
@@ -31,7 +1644,142 @@
       ],
       "draft_validation": "types_only_allow_incomplete",
       "checkpoint_weights": null,
-      "auto_complete": false
+      "auto_complete": false,
+      "group": "Công việc chung",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT",
+        "DESIGNER",
+        "MARKETPLACE",
+        "ADS",
+        "HR",
+        "ACCOUNTANT",
+        "WAREHOUSE",
+        "INTERN",
+        "TESTER_OPTIONAL"
+      ]
+    },
+    {
+      "code": "OUTBOUND_REPORT",
+      "name": "Báo cáo xuất kho",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kho & thiết bị",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "WAREHOUSE"
+      ]
+    },
+    {
+      "code": "PAYMENT_REQUEST_PROCESS",
+      "name": "Xử lý đề nghị thanh toán",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "PERFORMANCE_AUDIT",
+      "name": "Đánh giá hiệu quả nội dung",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "PRACTICE",
+      "name": "Thực hành chuyên môn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Thực tập",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "INTERN"
+      ]
     },
     {
       "code": "PRODUCT_RESEARCH",
@@ -109,54 +1857,175 @@
       ],
       "draft_validation": "types_only_allow_incomplete",
       "checkpoint_weights": null,
-      "auto_complete": false
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
     },
     {
-      "code": "COMPETITOR_RESEARCH",
-      "name": "Phân tích đối thủ",
+      "code": "PRODUCT_SEO",
+      "name": "Tối ưu tìm kiếm sản phẩm",
       "fields": [
         {
-          "key": "competitors",
-          "label": "Đối thủ",
-          "type": "array",
-          "phase": "WORK",
-          "required_at_action": false,
-          "items": {
-            "name": "string",
-            "url": "url",
-            "observed_at": "date",
-            "price": "decimal_nullable",
-            "strengths": "string",
-            "weaknesses": "string"
-          }
-        },
-        {
-          "key": "comparison",
-          "label": "So sánh",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "recommendations",
-          "label": "Đề xuất",
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
           "type": "string",
           "phase": "WORK",
           "required_at_action": false
         }
       ],
+      "checkpoints": [],
       "submission_rule": {
         "any_of": [
-          "comparison",
+          "result_text",
           "ready_asset_id",
           "valid_url"
         ]
       },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "PROMOTION_PREP",
+      "name": "Chuẩn bị chương trình khuyến mại",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "PROP_PREP",
+      "name": "Chuẩn bị đạo cụ",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "PUBLISH",
+      "name": "Đăng nội dung",
+      "fields": [
+        {
+          "key": "content_id",
+          "label": "Nội dung",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "channel_id",
+          "label": "Kênh",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "approved_version_id",
+          "label": "Bản duyệt",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "caption",
+          "label": "Caption",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "publication_url",
+          "label": "Link bài đăng",
+          "type": "url",
+          "phase": "SUBMIT",
+          "required_at_action": false
+        },
+        {
+          "key": "platform_post_id",
+          "label": "Mã bài",
+          "type": "string",
+          "phase": "SUBMIT",
+          "required_at_action": false
+        },
+        {
+          "key": "published_at",
+          "label": "Thời điểm đăng",
+          "type": "datetime",
+          "phase": "SUBMIT",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "required": [
+          "channel_id",
+          "published_at"
+        ],
+        "any_of": [
+          "publication_url",
+          "platform_post_id"
+        ],
+        "approved_version_policy": "Nếu workflow yêu cầu duyệt, phải gắn bản duyệt đúng content"
+      },
       "checkpoints": [
-        "Chọn đối thủ",
-        "Quan sát và dẫn nguồn",
-        "So sánh",
-        "Kết luận"
+        "Bản final",
+        "Caption/gắn sản phẩm",
+        "Đăng",
+        "Kiểm tra hiển thị"
       ],
       "version": 1,
       "status": "PROPOSED_SEED",
@@ -167,7 +2036,284 @@
       ],
       "draft_validation": "types_only_allow_incomplete",
       "checkpoint_weights": null,
-      "auto_complete": false
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "PURCHASE_DOC_FOLLOWUP",
+      "name": "Theo dõi chứng từ mua hàng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "RECONCILE",
+      "name": "Đối chiếu chứng từ và số liệu",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "REIMBURSEMENT_PROCESS",
+      "name": "Xử lý đề nghị hoàn chi",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "RETEST",
+      "name": "Kiểm thử lại sau sửa lỗi",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kiểm thử",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "TESTER_OPTIONAL"
+      ]
+    },
+    {
+      "code": "RETURN_CANCEL_REVIEW",
+      "name": "Rà soát hoàn và hủy đơn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
+    },
+    {
+      "code": "SALES_INVOICE_REQUEST_PROCESS",
+      "name": "Xử lý yêu cầu xuất hóa đơn",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kế toán",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "ACCOUNTANT"
+      ]
+    },
+    {
+      "code": "SAMPLE_ISSUE",
+      "name": "Xuất mẫu hàng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kho & thiết bị",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "WAREHOUSE"
+      ]
+    },
+    {
+      "code": "SAMPLE_RETURN",
+      "name": "Nhận trả mẫu hàng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Kho & thiết bị",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "WAREHOUSE"
+      ]
+    },
+    {
+      "code": "SAMPLE_SHIP_FOLLOWUP",
+      "name": "Theo dõi vận chuyển mẫu",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
     },
     {
       "code": "SCRIPT",
@@ -237,7 +2383,77 @@
       ],
       "draft_validation": "types_only_allow_incomplete",
       "checkpoint_weights": null,
-      "auto_complete": false
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
+    },
+    {
+      "code": "SHOOT",
+      "name": "Quay video",
+      "fields": [
+        {
+          "key": "shoot_session_id",
+          "label": "Buổi quay",
+          "type": "reference",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "footage_assets",
+          "label": "Tư liệu",
+          "type": "reference_array",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "shot_completion",
+          "label": "Cảnh đã quay",
+          "type": "array",
+          "phase": "WORK",
+          "required_at_action": false
+        },
+        {
+          "key": "missing_shots",
+          "label": "Cảnh còn thiếu",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "submission_rule": {
+        "any_of": [
+          "ready_asset_id",
+          "footage_url"
+        ]
+      },
+      "checkpoints": [
+        "Chuẩn bị",
+        "Quay",
+        "Kiểm tra tư liệu",
+        "Bàn giao"
+      ],
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "create_required": [
+        "title",
+        "owner_id",
+        "due_at"
+      ],
+      "draft_validation": "types_only_allow_incomplete",
+      "checkpoint_weights": null,
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "CONTENT"
+      ]
     },
     {
       "code": "SHOOT_PREP",
@@ -340,406 +2556,164 @@
       ],
       "draft_validation": "types_only_allow_incomplete",
       "checkpoint_weights": null,
-      "auto_complete": false
+      "auto_complete": false,
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
     },
     {
-      "code": "SHOOT",
-      "name": "Quay video",
+      "code": "SHOP_DAILY_REVIEW",
+      "name": "Kiểm tra hoạt động sàn hàng ngày",
       "fields": [
         {
-          "key": "shoot_session_id",
-          "label": "Buổi quay",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "footage_assets",
-          "label": "Tư liệu",
-          "type": "reference_array",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "shot_completion",
-          "label": "Cảnh đã quay",
-          "type": "array",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "missing_shots",
-          "label": "Cảnh còn thiếu",
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
           "type": "string",
           "phase": "WORK",
           "required_at_action": false
         }
       ],
+      "checkpoints": [],
       "submission_rule": {
         "any_of": [
+          "result_text",
           "ready_asset_id",
-          "footage_url"
+          "valid_url"
         ]
       },
-      "checkpoints": [
-        "Chuẩn bị",
-        "Quay",
-        "Kiểm tra tư liệu",
-        "Bàn giao"
-      ],
       "version": 1,
       "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
-      ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
     },
     {
-      "code": "EDIT",
-      "name": "Dựng video",
+      "code": "SHOP_WEEKLY_REPORT",
+      "name": "Tổng hợp báo cáo sàn hàng tuần",
       "fields": [
         {
-          "key": "source_assets",
-          "label": "Tư liệu đầu vào",
-          "type": "reference_array",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "edit_notes",
-          "label": "Yêu cầu dựng",
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
           "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "duration_seconds",
-          "label": "Thời lượng",
-          "type": "decimal",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "subtitle_asset",
-          "label": "Phụ đề",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "cover_asset",
-          "label": "Ảnh bìa",
-          "type": "reference",
           "phase": "WORK",
           "required_at_action": false
         }
       ],
+      "checkpoints": [],
       "submission_rule": {
         "any_of": [
-          "video_ready_asset_id",
-          "video_valid_url"
-        ],
-        "conditional_requirements": "duration/subtitle/cover chỉ bắt nếu brief yêu cầu"
-      },
-      "checkpoints": [
-        "Nhận tư liệu",
-        "Rough cut",
-        "Kiểm âm/phụ đề",
-        "Nộp bản xem",
-        "Sửa",
-        "Bàn giao"
-      ],
-      "version": 1,
-      "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
-      ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
-    },
-    {
-      "code": "PUBLISH",
-      "name": "Đăng nội dung",
-      "fields": [
-        {
-          "key": "content_id",
-          "label": "Nội dung",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "channel_id",
-          "label": "Kênh",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "approved_version_id",
-          "label": "Bản duyệt",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "caption",
-          "label": "Caption",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "publication_url",
-          "label": "Link bài đăng",
-          "type": "url",
-          "phase": "SUBMIT",
-          "required_at_action": false
-        },
-        {
-          "key": "platform_post_id",
-          "label": "Mã bài",
-          "type": "string",
-          "phase": "SUBMIT",
-          "required_at_action": false
-        },
-        {
-          "key": "published_at",
-          "label": "Thời điểm đăng",
-          "type": "datetime",
-          "phase": "SUBMIT",
-          "required_at_action": false
-        }
-      ],
-      "submission_rule": {
-        "required": [
-          "channel_id",
-          "published_at"
-        ],
-        "any_of": [
-          "publication_url",
-          "platform_post_id"
-        ],
-        "approved_version_policy": "Nếu workflow yêu cầu duyệt, phải gắn bản duyệt đúng content"
-      },
-      "checkpoints": [
-        "Bản final",
-        "Caption/gắn sản phẩm",
-        "Đăng",
-        "Kiểm tra hiển thị"
-      ],
-      "version": 1,
-      "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
-      ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
-    },
-    {
-      "code": "MEASURE",
-      "name": "Đo hiệu quả",
-      "fields": [
-        {
-          "key": "subject_id",
-          "label": "Bài đăng hoặc live",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "window_start",
-          "label": "Từ ngày",
-          "type": "date",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "window_end",
-          "label": "Đến ngày",
-          "type": "date",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "source",
-          "label": "Nguồn",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "metrics",
-          "label": "Các chỉ số",
-          "type": "metric_array",
-          "phase": "WORK",
-          "required_at_action": false
-        }
-      ],
-      "submission_rule": {
-        "required": [
-          "subject_id",
-          "window_start",
-          "window_end",
-          "source"
-        ],
-        "missing_allowed_with_reason": true
-      },
-      "checkpoints": [
-        "Chọn kỳ/nguồn",
-        "Nhập hoặc import",
-        "Kiểm dữ liệu",
-        "Phân tích"
-      ],
-      "version": 1,
-      "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
-      ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
-    },
-    {
-      "code": "DESIGN",
-      "name": "Thiết kế",
-      "fields": [
-        {
-          "key": "brief",
-          "label": "Yêu cầu",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "dimensions",
-          "label": "Kích thước",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "copy",
-          "label": "Nội dung chữ",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "brand_assets",
-          "label": "Tài nguyên",
-          "type": "reference_array",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "design_output",
-          "label": "Bản thiết kế",
-          "type": "reference_array",
-          "phase": "SUBMIT",
-          "required_at_action": false
-        }
-      ],
-      "submission_rule": {
-        "any_of": [
-          "design_ready_asset_id",
-          "design_valid_url"
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
         ]
       },
-      "checkpoints": [
-        "Brief",
-        "Thiết kế",
-        "Nộp",
-        "Sửa/bàn giao"
-      ],
       "version": 1,
       "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
-      ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
+      "group": "Vận hành sàn",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "MARKETPLACE"
+      ]
     },
     {
-      "code": "COMPENSATION_ENTRY",
-      "name": "Nhập bồi hoàn",
+      "code": "SOURCE_HANDOVER",
+      "name": "Bàn giao file nguồn",
       "fields": [
         {
-          "key": "channel_id",
-          "label": "Shop",
-          "type": "reference",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "order_id",
-          "label": "ID đơn",
-          "type": "string",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "sku_lines",
-          "label": "SKU",
-          "type": "array",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "reported_amount",
-          "label": "Số tiền",
-          "type": "decimal",
-          "phase": "WORK",
-          "required_at_action": false
-        },
-        {
-          "key": "currency",
-          "label": "Đơn vị tiền",
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
           "type": "string",
           "phase": "WORK",
           "required_at_action": false
         }
       ],
+      "checkpoints": [],
       "submission_rule": {
-        "required": [
-          "channel_id",
-          "order_id",
-          "reported_amount",
-          "currency"
-        ],
-        "amount_stage": "Q15 chưa chốt không mặc định RECEIVED"
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
       },
-      "checkpoints": [
-        "Thông tin đơn",
-        "Nhập số tiền",
-        "Kiểm dữ liệu"
-      ],
       "version": 1,
       "status": "PROPOSED_SEED",
-      "create_required": [
-        "title",
-        "owner_id",
-        "due_at"
+      "group": "Thiết kế",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "DESIGNER"
+      ]
+    },
+    {
+      "code": "THUMBNAIL",
+      "name": "Thiết kế ảnh bìa",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
       ],
-      "draft_validation": "types_only_allow_incomplete",
-      "checkpoint_weights": null,
-      "auto_complete": false
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Thiết kế",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "ARTIFACT_REQUIRED",
+      "roles": [
+        "DESIGNER"
+      ]
+    },
+    {
+      "code": "TREND_RESEARCH",
+      "name": "Nghiên cứu xu hướng",
+      "fields": [
+        {
+          "key": "summary",
+          "label": "Ghi chú chuyên môn",
+          "type": "string",
+          "phase": "WORK",
+          "required_at_action": false
+        }
+      ],
+      "checkpoints": [],
+      "submission_rule": {
+        "any_of": [
+          "result_text",
+          "ready_asset_id",
+          "valid_url"
+        ]
+      },
+      "version": 1,
+      "status": "PROPOSED_SEED",
+      "group": "Nội dung & sản xuất",
+      "enabled": true,
+      "ready_gate_enabled": false,
+      "output_policy": "TEXT_OR_ARTIFACT",
+      "roles": [
+        "CONTENT"
+      ]
     }
-  ],
-  "unlisted_types": "Dùng OTHER contract tới khi cấu hình schema chuyên môn; không tự bịa required fields"
+  ]
 }

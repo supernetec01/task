@@ -54,6 +54,10 @@ export async function api(
       'Máy chủ chưa trả dữ liệu hợp lệ. Hãy tải lại trang hoặc liên hệ quản trị viên.',
     );
   }
+  if (path !== '/me' && (response.status === 401 || response.status === 403))
+    window.dispatchEvent(new Event('sn-access-refresh'));
+  if (response.ok && method !== 'GET' && /^\/(users|grants|account-grants)/.test(path))
+    window.dispatchEvent(new Event('sn-access-refresh'));
   if (!response.ok) throw new ApiError(response.status, data.code, data.message, data.field_errors);
   if (path === '/me' && (!data?.id || typeof data.name !== 'string' || !Array.isArray(data.grants)))
     throw new ApiError(

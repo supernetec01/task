@@ -4,6 +4,10 @@
 
 Đây là bản bàn giao **để kiểm thử nội bộ**, không đồng nghĩa đã nghiệm thu trên máy Windows/LAN của công ty. Xem [báo cáo kiểm thử](docs/TESTING.md), [ma trận yêu cầu](docs/REQUIREMENTS.csv), [chính sách còn mở](docs/DECISIONS.md) và [hướng dẫn Windows](docs/WINDOWS.md).
 
+## Cập nhật giao diện 07/11
+
+Đã thêm drawer công việc ba tab, tạo việc kèm tài liệu, cập nhật/nộp kết quả chung, trao đổi riêng và quản trị mẫu có phiên bản. Bản này **có migration 005**; người đang dùng cần sao lưu rồi chạy `npm run migrate` sau build. Xem [phạm vi sửa và lệnh cập nhật Windows](docs/REDESIGN-20261107.md).
+
 ## Chạy thử trên Windows
 
 1. Cài Git, **Node.js 24 LTS**, **PostgreSQL 17** từ nguồn chính thức. Thêm thư mục `bin` PostgreSQL vào PATH (phải có `psql`, `pg_dump`, `pg_restore`). Không mở cổng database cho LAN.

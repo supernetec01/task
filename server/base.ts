@@ -17,6 +17,7 @@ export type Actor = {
   id: string;
   name: string;
   username: string;
+  permission_version: number;
   email: string | null;
   team_id: string | null;
   grants: any[];
@@ -76,7 +77,7 @@ export const one = async (c: DB, sql: string, args: unknown[] = []) =>
 export async function actor(c: DB, id: string): Promise<Actor> {
   const u = await one(
     c,
-    'SELECT id,username,name,email,team_id FROM users WHERE id=$1 AND active',
+    'SELECT id,username,name,email,team_id,permission_version FROM users WHERE id=$1 AND active',
     [id],
   );
   need(u, 'Tài khoản đã bị vô hiệu hóa', 401, 'UNAUTHORIZED');

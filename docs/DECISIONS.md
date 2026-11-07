@@ -19,3 +19,5 @@ Thiết kế kỹ thuật được chọn: modular monolith Node.js 24 + TypeScr
 Admin ghi người chốt/lý do/ngày khi thay policy trong Thiết lập; audit lưu actor/thời gian. Các policy demo bật trong seed chỉ dành DB demo. Quyết định kỹ thuật ở đây không thay thế quyết định nghiệp vụ của chủ hệ thống.
 
 Các extension P nâng cao (ERP đầy đủ, sổ tồn, thuế/BHXH, ngân hàng, hóa đơn điện tử, tự đổi password trên TikTok/Shopee, subscriptions tự gia hạn, định mức/điểm thái độ) không nằm trong nghiệp vụ tự động của bản này. Các nguồn thật chưa được cung cấp trong bộ tài liệu cần đối chiếu khi người dùng chạy thử.
+
+Ngày 07/11: registry mẫu có phiên bản, 74 mẫu seed có nhãn; không dùng OTHER làm fallback runtime cho mã cấu hình thiếu. Snapshot của task lịch sử giữ contract trước migration. Ready gate mới không tự bật; Admin bật theo quyết định. Live report lấy owner/trạng thái hiện tại tại cutoff; submitted report bất biến sau transfer. Chính sách phân bổ owner lịch sử Q07 vẫn mở, không tự đổi attribution.

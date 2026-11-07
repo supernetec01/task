@@ -72,7 +72,7 @@ export const roleLabel: Record<string, string> = {
   COMMON: 'Bổ sung chung',
   TESTER_OPTIONAL: 'Kiểm thử',
 };
-function Control({
+export function FieldControl({
   field: f,
   value,
   onChange,
@@ -89,7 +89,7 @@ function Control({
         {(value || []).map((row: any, i: number) => (
           <div className="array-row" key={i}>
             {f.fields?.map((sub) => (
-              <Control
+              <FieldControl
                 key={sub.key}
                 field={sub}
                 value={row[sub.key]}
@@ -160,6 +160,9 @@ export function Form({
   label = 'Lưu',
   children,
   onChange,
+  secondary,
+  extraFields = [],
+  extraTitle,
 }: {
   fields: Field[];
   initial?: any;
@@ -167,6 +170,9 @@ export function Form({
   label?: string;
   children?: ReactNode;
   onChange?: (v: any) => void;
+  secondary?: ReactNode;
+  extraFields?: Field[];
+  extraTitle?: string;
 }) {
   const [value, setValue] = useState(initial),
     [busy, setBusy] = useState(false),
@@ -197,7 +203,7 @@ export function Form({
     >
       <div className="form-fields">
         {fields.map((f) => (
-          <Control
+          <FieldControl
             key={f.key}
             field={f}
             value={value[f.key]}
@@ -209,12 +215,32 @@ export function Form({
           />
         ))}
       </div>
+      {extraFields.length > 0 && (
+        <details className="specialized-fields">
+          <summary>{extraTitle || 'Thông tin chuyên môn'}</summary>
+          <div className="form-fields">
+            {extraFields.map((f) => (
+              <FieldControl
+                key={f.key}
+                field={f}
+                value={value[f.key]}
+                onChange={(v) => {
+                  const next = { ...value, [f.key]: v };
+                  setValue(next);
+                  onChange?.(next);
+                }}
+              />
+            ))}
+          </div>
+        </details>
+      )}
       {children}
       <ErrorBox error={error} />
       <div className="form-footer">
         <button disabled={busy} className="primary">
           {busy ? 'Đang lưu…' : label}
         </button>
+        {secondary}
         {saved && <span role="status">Đã lưu thành công</span>}
       </div>
     </form>
@@ -263,13 +289,14 @@ export function Modal({
     </dialog>
   );
 }
-export function useLoad(path: string, revision = 0) {
+export function useLoad(path: string | null, revision = 0) {
   const [data, setData] = useState<any>(null),
     [error, setError] = useState<any>(null);
   useEffect(() => {
     let live = true;
     setData(null);
     setError(null);
+    if (!path) return;
     api(path).then(
       (d) => {
         if (live) setData(d);

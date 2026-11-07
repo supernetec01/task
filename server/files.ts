@@ -14,6 +14,7 @@ import {
   hasJob,
   isAdmin,
   manages,
+  management,
 } from './base.js';
 import { taskAccess } from './tasks.js';
 export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
@@ -45,6 +46,40 @@ export function sniff(ext: string, b: Buffer) {
   return false;
 }
 export function fileRoutes(api: API) {
+  api('POST', '/task-attachments', async (c, a, b) => {
+    need(a.grants.some((g) => g.kind === 'JOB') || management(a), 'Chưa có quyền tạo công việc');
+    const ext = extname(b.filename).slice(1).toLowerCase();
+    const allowed = (
+      process.env.UPLOAD_EXTENSIONS || 'pdf,png,jpg,jpeg,webp,txt,csv,xlsx,docx,mp4,zip'
+    ).split(',');
+    need(
+      allowed.includes(ext) && sniff(ext, b.buffer),
+      'Loại/nội dung tệp không hợp lệ hoặc chưa được cho phép',
+      422,
+      'FILE_TYPE',
+    );
+    need(b.buffer.length > 0, 'Tệp rỗng', 422, 'FILE_EMPTY');
+    const id = randomUUID(),
+      key = id + '.' + ext,
+      shared = b.fields.shared === 'true';
+    await writeFile(join(dataDir, key), b.buffer, { mode: 0o600, flag: 'wx' });
+    return one(
+      c,
+      'INSERT INTO staged_task_assets(id,uploaded_by,filename,storage_key,size,sha256,mime,shared) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,filename,size,shared',
+      [
+        id,
+        a.id,
+        String(b.filename)
+          .replace(/[\\/\x00-\x1f]/g, '_')
+          .slice(0, 200),
+        key,
+        b.buffer.length,
+        hash(b.buffer),
+        'application/octet-stream',
+        shared,
+      ],
+    );
+  });
   api('POST', '/assets', async (c, a, b) => {
     const v = z
       .object({

@@ -1,5 +1,16 @@
 # Báo cáo kiểm thử — 06/11/2026
 
+## Thiết kế lại theo file Fix lần 1 — 07/11/2026
+
+Bản cập nhật này có **migration 005**. Xem [phạm vi F01–F12 và hướng dẫn Windows](REDESIGN-20261107.md); thông tin “không có migration” ở mục sửa trang trắng bên dưới chỉ áp dụng commit 559c9ab cũ.
+
+- `npm run build`: đạt với Node 24, PostgreSQL 17, Chromium trên Linux.
+- Unit/integration: **50/50** trong DB/DATA_DIR riêng; giữ toàn bộ regression cũ. Thêm kiểm tra đủ mapping 74 mẫu, Admin/version/conflict, snapshot task cũ, backfill contract cũ không đổi ID/status/payload/version/timestamp, staging private/atomic, update→SUBMITTED, chat/idempotency/quyền, báo cáo sau transfer, grain/unique và hạn chờ duyệt.
+- Playwright: **18/18** desktop/mobile; API thật cho giao/nhận/cập nhật/nộp/duyệt/nộp report/xuất XLSX. Thêm tạo kèm file, drawer ba tab, dirty guard/Escape/focus, giữ form khi 409, trao đổi plain text, hủy dialog không gọi API khi bỏ trống/quay lại và chỉ một request khi xác nhận, chỉnh mẫu qua UI. Thử cache invalidation bằng response capabilities thay đổi; server thu hồi quyền được thử độc lập trong integration.
+- Đã sao lưu và chạy migration 005 trên DB ứng dụng cloud hiện có; so fingerprint trước/sau xác nhận 11 users, 17 tasks và 5 report revisions giữ nguyên dữ liệu cũ (ngoài hai cột snapshot mới). Không đổi mật khẩu hay chạy bootstrap/seed lại.
+- HTTP LAN được mô phỏng bằng origin HTTP trong Chromium, không thay cho thử firewall/PowerShell/LAN hai máy Windows thật. UI_SPEC/prototype mới và file doanh thu thực tế chưa được cung cấp; chưa thể nghiệm thu pixel/mapping/đối soát/attribution thật. Fixture CSV/XLSX là synthetic, không phải file xuất từ công ty.
+
+
 ## Sửa trang trắng khi truy cập HTTP LAN — 07/11/2026
 
 Đã tái hiện với bản build trước sửa trên HTTP origin mô phỏng LAN: `isSecureContext=false`, `crypto.randomUUID` không tồn tại, Form ném `crypto.randomUUID is not a function`, body trống trong khi CSS vẫn tải. Các bài browser trước chỉ dùng localhost (được trình duyệt coi là secure context), nên không bắt được lỗi này.

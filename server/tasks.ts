@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { type API } from './app.js';
 import {
@@ -18,10 +17,12 @@ import {
   setting,
   responseDue,
 } from './base.js';
-export const templates = JSON.parse(readFileSync('config/task_templates.json', 'utf8'))
-  .templates as any[];
-export const catalog = JSON.parse(readFileSync('config/role_task_catalog.json', 'utf8'))
-  .roles as Record<string, string[]>;
+import {
+  availableTemplates,
+  currentTemplate,
+  taskTemplate,
+  templateRoutes,
+} from './template-store.js';
 export async function taskAccess(c: DB, a: Actor, id: string, lock = false) {
   const t = await one(
     c,
@@ -56,7 +57,17 @@ export async function taskDetail(c: DB, a: Actor, id: string) {
     due_at: t.due_at,
     version: t.version,
     participation: s,
-    capabilities: { owner, manager, review: canReview },
+    capabilities: {
+      owner,
+      manager,
+      review: canReview,
+      comment: !!(owner || manager || (x.support && s?.status === 'ACCEPTED')),
+      update: owner && ['ACCEPTED', 'IN_PROGRESS', 'CHANGES_REQUESTED'].includes(t.status),
+      cancel:
+        !['DONE', 'CANCELLED'].includes(t.status) && (manager || (owner && t.created_by === a.id)),
+    },
+    template_name: taskTemplate(t).name,
+    template_version: t.template_version,
   };
   const assets = await rows(
     c,
@@ -67,6 +78,12 @@ export async function taskDetail(c: DB, a: Actor, id: string) {
     return { ...brief, assets, pending_brief: true };
   return {
     ...t,
+    template_name: taskTemplate(t).name,
+    updates: await rows(
+      c,
+      'SELECT v.*,u.name FROM task_updates v LEFT JOIN users u ON u.id=v.actor_id WHERE v.task_id=$1 ORDER BY v.created_at DESC LIMIT 100',
+      [id],
+    ),
     participation: s,
     capabilities: brief.capabilities,
     assets,
@@ -94,14 +111,19 @@ export async function taskDetail(c: DB, a: Actor, id: string) {
         : [],
   };
 }
-export function validatePayload(type: string, payload: any) {
+export function validatePayload(tmpl: any, payload: any) {
   need(
     payload && typeof payload === 'object' && !Array.isArray(payload),
     'Trường chuyên môn không hợp lệ',
     422,
     'VALIDATION',
   );
-  const tmpl = templates.find((t) => t.code === type) || templates[0];
+  need(
+    tmpl && Array.isArray(tmpl.fields),
+    'Mẫu chưa được cấu hình',
+    422,
+    'TEMPLATE_CONFIG_REQUIRED',
+  );
   for (const f of tmpl.fields) {
     const v = payload[f.key];
     if (v === undefined || v === null || v === '') continue;
@@ -156,10 +178,12 @@ export function validURL(v: unknown) {
 export async function createTask(c: DB, a: Actor, b: any) {
   const v = z
     .object({
+      attachment_ids: z.array(z.uuid()).max(50).default([]),
+      share_attachments: z.boolean().default(false),
       title: z.string().trim().min(1).max(255),
       description: z.string().max(50000).default(''),
       owner_id: z.uuid().optional(),
-      role: z.string(),
+      role: z.string().optional(),
       due_at: z.iso.datetime({ offset: true }).nullable().optional(),
       type: z.string().default('OTHER'),
       priority: z.enum(['NORMAL', 'URGENT']).default('NORMAL'),
@@ -173,19 +197,32 @@ export async function createTask(c: DB, a: Actor, b: any) {
     .parse(b);
   const ownerId = v.owner_id || a.id,
     oa = await actor(c, ownerId);
-  need(
-    hasJob(oa, v.role),
-    'Người phụ trách chưa có role này hoặc đã hết hạn',
-    422,
-    'ROLE_REQUIRED',
-  );
+  const role =
+    v.role ||
+    ([...new Set(oa.grants.filter((g) => g.kind === 'JOB').map((g) => g.role))].length === 1
+      ? oa.grants.find((g) => g.kind === 'JOB').role
+      : undefined);
+  need(role, 'Chọn chuyên môn khi người phụ trách có nhiều vai trò', 422, 'ROLE_REQUIRED');
+  need(hasJob(oa, role), 'Người phụ trách chưa có role này hoặc đã hết hạn', 422, 'ROLE_REQUIRED');
   need(ownerId === a.id || manages(a, { id: ownerId, team_id: oa.team_id }));
   need(v.draft || v.due_at, 'Cần thời hạn', 422, 'VALIDATION');
+  const tmpl = await currentTemplate(c, v.type, role);
   need(
-    (catalog[v.role] || ['OTHER']).includes(v.type),
-    'Loại task không thuộc role',
+    new Set(v.attachment_ids).size === v.attachment_ids.length,
+    'Tệp đính kèm bị trùng',
     422,
     'VALIDATION',
+  );
+  const attachments = await rows(
+    c,
+    'SELECT * FROM staged_task_assets WHERE id=ANY($1) AND uploaded_by=$2 FOR UPDATE',
+    [v.attachment_ids, a.id],
+  );
+  need(
+    attachments.length === v.attachment_ids.length,
+    'Tệp chưa sẵn sàng hoặc không thuộc người tạo',
+    422,
+    'ASSET_NOT_READY',
   );
   const u = await one(c, 'SELECT reviewer_id FROM users WHERE id=$1', [ownerId]);
   const reviewerId = ownerId !== a.id ? a.id : u.reviewer_id;
@@ -229,31 +266,51 @@ export async function createTask(c: DB, a: Actor, b: any) {
   }
   const t = await one(
     c,
-    `INSERT INTO tasks(title,description,owner_id,created_by,reviewer_id,role,type,priority,status,source,original_due_at,due_at,occurred_at,started_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,CASE WHEN $9='IN_PROGRESS' THEN now() END) RETURNING *`,
+    `INSERT INTO tasks(title,description,owner_id,created_by,reviewer_id,role,type,priority,status,source,original_due_at,due_at,occurred_at,started_at,template_version,template_version_id,template_snapshot) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$12,CASE WHEN $9='IN_PROGRESS' THEN now() END,$13,$14,$15) RETURNING *`,
     [
       v.title,
       v.description,
       ownerId,
       a.id,
       reviewerId || null,
-      v.role,
+      role,
       v.type,
       v.priority,
       v.draft ? 'DRAFT' : ownerId === a.id ? 'IN_PROGRESS' : 'ASSIGNED',
       ownerId === a.id ? 'EMPLOYEE_ADHOC' : 'MANAGER_ASSIGNED',
       v.due_at || null,
       v.occurred_at || null,
+      tmpl.version,
+      tmpl.id,
+      JSON.stringify(tmpl.definition),
     ],
   );
   await c.query('INSERT INTO owner_history(task_id,owner_id,role,reason) VALUES($1,$2,$3,$4)', [
     t.id,
     ownerId,
-    v.role,
+    role,
     'CREATED',
   ]);
   if (t.status === 'ASSIGNED') await assign(c, t);
-  const tmpl = templates.find((x) => x.code === v.type) || templates[0];
-  for (const [i, title] of tmpl.checkpoints.entries())
+  for (const f of attachments)
+    await c.query(
+      'INSERT INTO assets(id,task_id,uploaded_by,role,filename,storage_key,size,sha256,mime,shared) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+      [
+        f.id,
+        t.id,
+        a.id,
+        role,
+        f.filename,
+        f.storage_key,
+        f.size,
+        f.sha256,
+        f.mime,
+        v.share_attachments,
+      ],
+    );
+  if (attachments.length)
+    await c.query('DELETE FROM staged_task_assets WHERE id=ANY($1)', [v.attachment_ids]);
+  for (const [i, title] of tmpl.definition.checkpoints.entries())
     await c.query('INSERT INTO checkpoints(task_id,title,position) VALUES($1,$2,$3)', [
       t.id,
       title,
@@ -293,12 +350,8 @@ export async function assign(c: DB, t: any) {
   );
 }
 export function taskRoutes(api: API) {
-  api('GET', '/task-types', async (c, a) => ({
-    items: templates,
-    catalog: Object.fromEntries(
-      Object.entries(catalog).filter(([r]) => hasJob(a, r) || isAdmin(a)),
-    ),
-  }));
+  templateRoutes(api);
+  api('GET', '/task-types', async (c, a) => availableTemplates(c, a));
   api('POST', '/tasks', createTask);
   api('GET', '/tasks', async (c, a, b, q) => {
     const mode = q.mode === 'team' && management(a) ? 'team' : 'mine';
@@ -321,6 +374,67 @@ export function taskRoutes(api: API) {
       items,
       next_cursor: accessible.length > 100 ? String((Number(q.cursor) || 0) + 100) : null,
     };
+  });
+  api('POST', '/tasks/:id/update-result', async (c, a, b, q, p) => {
+    const v = z
+      .object({
+        state: z.enum(['IN_PROGRESS', 'SUBMITTED']),
+        summary: z.string().max(20000).default(''),
+        next_step: z.string().max(5000).default(''),
+        blocker: z.string().max(5000).default(''),
+        payload: z.record(z.string(), z.unknown()).optional(),
+        links: z.array(z.url()).default([]),
+        artifact_refs: z.array(z.uuid()).default([]),
+        expected_version: z.number().int(),
+      })
+      .parse(b);
+    const { t, owner } = await taskAccess(c, a, p.id, true);
+    need(owner);
+    version(t, v.expected_version);
+    if (v.payload) validatePayload(taskTemplate(t), v.payload);
+    if (v.state === 'IN_PROGRESS') {
+      await updateProgress(c, a, v, t.id);
+      if (v.payload)
+        await c.query('UPDATE tasks SET payload=$2 WHERE id=$1', [t.id, JSON.stringify(v.payload)]);
+    } else {
+      await submitTask(c, a, { ...v, result_text: v.summary }, t.id);
+      await c.query('UPDATE tasks SET next_step=$2,blocker=$3 WHERE id=$1', [
+        t.id,
+        v.next_step,
+        v.blocker,
+      ]);
+      await c.query(
+        'INSERT INTO task_updates(task_id,actor_id,summary,next_step,blocker) VALUES($1,$2,$3,$4,$5)',
+        [t.id, a.id, v.summary, v.next_step, v.blocker],
+      );
+    }
+    return taskDetail(c, a, t.id);
+  });
+  api('GET', '/tasks/:id/comments', async (c, a, b, q, p) => {
+    const x = await taskAccess(c, a, p.id);
+    need(x.owner || x.manager || (x.support && x.s.status === 'ACCEPTED'));
+    const cursor = Math.max(0, Number(q.after) || 0);
+    const messages = await rows(
+      c,
+      'SELECT m.*,u.name AS author_name FROM task_comments m JOIN users u ON u.id=m.author_id WHERE task_id=$1 AND m.id>$2 ORDER BY m.id LIMIT 101',
+      [p.id, cursor],
+    );
+    return {
+      items: messages.slice(0, 100),
+      next_cursor: messages.length > 100 ? messages[99].id : null,
+    };
+  });
+  api('POST', '/tasks/:id/comments', async (c, a, b, q, p) => {
+    const x = await taskAccess(c, a, p.id);
+    need(x.owner || x.manager || (x.support && x.s.status === 'ACCEPTED'));
+    const v = z.object({ body: z.string().trim().min(1).max(10000) }).parse(b);
+    const m = await one(
+      c,
+      'INSERT INTO task_comments(task_id,author_id,body) VALUES($1,$2,$3) RETURNING *',
+      [p.id, a.id, v.body],
+    );
+    await event(c, a, p.id, 'COMMENT_POSTED', { comment_id: m.id });
+    return { ...m, author_name: a.name };
   });
   api('GET', '/tasks/:id', async (c, a, b, q, p) => taskDetail(c, a, p.id));
   api('PATCH', '/tasks/:id', async (c, a, b, q, p) => {
@@ -358,7 +472,7 @@ export function taskRoutes(api: API) {
       409,
       'STATE',
     );
-    validatePayload(t.type, b.values);
+    validatePayload(taskTemplate(t), b.values);
     await c.query('UPDATE tasks SET payload=$2,version=version+1,updated_at=now() WHERE id=$1', [
       t.id,
       JSON.stringify(b.values),
@@ -464,30 +578,7 @@ export function taskRoutes(api: API) {
     await event(c, a, t.id, 'STARTED');
     return taskDetail(c, a, t.id);
   });
-  api('POST', '/tasks/:id/updates', async (c, a, b, q, p) => {
-    const { t, owner } = await taskAccess(c, a, p.id, true);
-    need(owner);
-    version(t, b.expected_version);
-    need(
-      ['IN_PROGRESS', 'ACCEPTED', 'CHANGES_REQUESTED'].includes(t.status),
-      'Không thể cập nhật công việc đã nộp/đóng',
-      409,
-      'STATE',
-    );
-    const v = z
-      .object({
-        summary: z.string().max(20000),
-        next_step: z.string().max(5000),
-        blocker: z.string().max(5000),
-      })
-      .parse(b);
-    await c.query(
-      "UPDATE tasks SET next_step=$2,blocker=$3,started_at=coalesce(started_at,now()),status='IN_PROGRESS',version=version+1,updated_at=now() WHERE id=$1",
-      [t.id, v.next_step, v.blocker],
-    );
-    await event(c, a, t.id, 'PROGRESS', v);
-    return taskDetail(c, a, t.id);
-  });
+  api('POST', '/tasks/:id/updates', async (c, a, b, q, p) => updateProgress(c, a, b, p.id));
   api('PATCH', '/checkpoints/:id', async (c, a, b, q, p) => {
     const cp = await one(c, 'SELECT * FROM checkpoints WHERE id=$1 FOR UPDATE', [p.id]);
     need(cp, 'Không tìm thấy', 404, 'NOT_FOUND');
@@ -511,84 +602,7 @@ export function taskRoutes(api: API) {
     await event(c, a, t.id, 'CHECKPOINT', { id: cp.id, ...v });
     return { ok: true };
   });
-  api('POST', '/tasks/:id/submissions', async (c, a, b, q, p) => {
-    const { t, owner } = await taskAccess(c, a, p.id, true);
-    need(owner);
-    version(t, b.expected_version);
-    need(
-      ['IN_PROGRESS', 'ACCEPTED', 'CHANGES_REQUESTED'].includes(t.status),
-      'Không thể nộp ở trạng thái này',
-      409,
-      'STATE',
-    );
-    const v = z
-      .object({
-        result_text: z.string().max(50000).default(''),
-        payload: z.record(z.string(), z.unknown()).optional(),
-        links: z.array(z.url()).max(50).default([]),
-        artifact_refs: z.array(z.uuid()).max(100).default([]),
-      })
-      .parse(b);
-    need(v.links.every(validURL), 'Chỉ dùng URL http/https', 422, 'VALIDATION');
-    for (const id of v.artifact_refs) {
-      const f = await one(c, 'SELECT id FROM assets WHERE id=$1 AND task_id=$2', [id, t.id]);
-      need(f, 'Tệp chưa sẵn sàng hoặc khác task', 422, 'ASSET_NOT_READY');
-    }
-    const payload = validatePayload(t.type, v.payload || t.payload),
-      tmpl = templates.find((x) => x.code === t.type) || templates[0];
-    for (const f of tmpl.submission_rule.required || [])
-      need(
-        payload[f] !== undefined && payload[f] !== '' && payload[f] !== null,
-        `Cần bổ sung ${f} khi nộp`,
-        422,
-        'VALIDATION',
-      );
-    const hasArtifact = v.artifact_refs.length || v.links.length;
-    need(
-      v.result_text.trim() || hasArtifact,
-      'Cần kết quả văn bản hoặc tệp/link',
-      422,
-      'VALIDATION',
-    );
-    if (['EDIT', 'SHOOT', 'DESIGN'].includes(t.type))
-      need(hasArtifact, 'Loại việc này cần tệp hoặc link đầu ra', 422, 'VALIDATION');
-    if (t.type === 'PUBLISH')
-      need(
-        payload.publication_url || payload.platform_post_id,
-        'Cần link hoặc ID bài đăng',
-        422,
-        'VALIDATION',
-      );
-    need(
-      !(await one(
-        c,
-        "SELECT id FROM checkpoints WHERE task_id=$1 AND required AND state<>'DONE' LIMIT 1",
-        [t.id],
-      )),
-      'Chưa hoàn tất mốc bắt buộc',
-      422,
-      'CHECKPOINT_REQUIRED',
-    );
-    const s = await one(
-      c,
-      'INSERT INTO submissions(task_id,revision,result_text,payload,links,due_at_at_submit) SELECT $1,coalesce(max(revision),0)+1,$2,$3,$4,$5 FROM submissions WHERE task_id=$1 RETURNING *',
-      [
-        t.id,
-        v.result_text,
-        JSON.stringify({ ...payload, artifact_refs: v.artifact_refs }),
-        JSON.stringify(v.links),
-        t.due_at,
-      ],
-    );
-    await c.query(
-      "UPDATE tasks SET status='SUBMITTED',payload=$2,result_text=$3,version=version+1,updated_at=now() WHERE id=$1",
-      [t.id, JSON.stringify(payload), v.result_text],
-    );
-    await event(c, a, t.id, 'SUBMITTED', { submission_id: s.id, revision: s.revision });
-    if (t.reviewer_id)
-      await notify(c, t.reviewer_id, 'submission:' + s.id, 'Có công việc chờ duyệt', t.id);
-    return taskDetail(c, a, t.id);
-  });
+  api('POST', '/tasks/:id/submissions', async (c, a, b, q, p) => submitTask(c, a, b, p.id));
   api('POST', '/submissions/:id/review', async (c, a, b, q, p) => {
     const s = await one(c, 'SELECT * FROM submissions WHERE id=$1', [p.id]);
     need(s, 'Không tìm thấy', 404, 'NOT_FOUND');
@@ -833,4 +847,114 @@ export function taskRoutes(api: API) {
     await event(c, a, s.task_id, 'CONTRIBUTION', { id: s.id, ...v });
     return result;
   });
+}
+
+export async function updateProgress(c: DB, a: Actor, b: any, id: string) {
+  const { t, owner } = await taskAccess(c, a, id, true);
+  need(owner);
+  version(t, b.expected_version);
+  need(
+    ['IN_PROGRESS', 'ACCEPTED', 'CHANGES_REQUESTED'].includes(t.status),
+    'Không thể cập nhật công việc đã nộp/đóng',
+    409,
+    'STATE',
+  );
+  const v = z
+    .object({
+      summary: z.string().max(20000),
+      next_step: z.string().max(5000),
+      blocker: z.string().max(5000),
+    })
+    .parse(b);
+  await c.query(
+    "UPDATE tasks SET next_step=$2,blocker=$3,started_at=coalesce(started_at,now()),status='IN_PROGRESS',version=version+1,updated_at=now() WHERE id=$1",
+    [t.id, v.next_step, v.blocker],
+  );
+  await c.query(
+    'INSERT INTO task_updates(task_id,actor_id,summary,next_step,blocker) VALUES($1,$2,$3,$4,$5)',
+    [t.id, a.id, v.summary, v.next_step, v.blocker],
+  );
+  await event(c, a, t.id, 'PROGRESS', v);
+  return taskDetail(c, a, t.id);
+}
+
+export async function submitTask(c: DB, a: Actor, b: any, id: string) {
+  const { t, owner } = await taskAccess(c, a, id, true);
+  need(owner);
+  version(t, b.expected_version);
+  need(
+    ['IN_PROGRESS', 'ACCEPTED', 'CHANGES_REQUESTED'].includes(t.status),
+    'Không thể nộp ở trạng thái này',
+    409,
+    'STATE',
+  );
+  const v = z
+    .object({
+      result_text: z.string().max(50000).default(''),
+      payload: z.record(z.string(), z.unknown()).optional(),
+      links: z.array(z.url()).max(50).default([]),
+      artifact_refs: z.array(z.uuid()).max(100).default([]),
+    })
+    .parse(b);
+  need(v.links.every(validURL), 'Chỉ dùng URL http/https', 422, 'VALIDATION');
+  for (const id of v.artifact_refs) {
+    const f = await one(c, 'SELECT id FROM assets WHERE id=$1 AND task_id=$2', [id, t.id]);
+    need(f, 'Tệp chưa sẵn sàng hoặc khác task', 422, 'ASSET_NOT_READY');
+  }
+  const tmpl = taskTemplate(t),
+    payload = validatePayload(tmpl, v.payload || t.payload);
+  for (const f of [
+    ...(tmpl.submission_rule?.action === 'READY' &&
+    !tmpl.ready_gate_enabled &&
+    !tmpl.legacy_contract
+      ? []
+      : tmpl.submission_rule?.required || []),
+    ...tmpl.fields.filter((f: any) => f.required_at_action).map((f: any) => f.key),
+  ])
+    need(
+      payload[f] !== undefined && payload[f] !== '' && payload[f] !== null,
+      `Cần bổ sung ${tmpl.fields.find((field: any) => field.key === f)?.label || 'thông tin bắt buộc của mẫu'} khi nộp`,
+      422,
+      'VALIDATION',
+    );
+  const hasArtifact = v.artifact_refs.length || v.links.length;
+  need(v.result_text.trim() || hasArtifact, 'Cần kết quả văn bản hoặc tệp/link', 422, 'VALIDATION');
+  if (tmpl.output_policy === 'ARTIFACT_REQUIRED')
+    need(hasArtifact, 'Loại việc này cần tệp hoặc link đầu ra', 422, 'VALIDATION');
+  if (t.type === 'PUBLISH')
+    need(
+      payload.publication_url || payload.platform_post_id,
+      'Cần link hoặc ID bài đăng',
+      422,
+      'VALIDATION',
+    );
+  need(
+    !(await one(
+      c,
+      "SELECT id FROM checkpoints WHERE task_id=$1 AND required AND state<>'DONE' LIMIT 1",
+      [t.id],
+    )),
+    'Chưa hoàn tất mốc bắt buộc',
+    422,
+    'CHECKPOINT_REQUIRED',
+  );
+  const s = await one(
+    c,
+    'INSERT INTO submissions(task_id,revision,result_text,payload,links,due_at_at_submit) SELECT $1,coalesce(max(revision),0)+1,$2,$3,$4,$5 FROM submissions WHERE task_id=$1 RETURNING *',
+    [
+      t.id,
+      v.result_text,
+      JSON.stringify({ ...payload, artifact_refs: v.artifact_refs }),
+      JSON.stringify(v.links),
+      t.due_at,
+    ],
+  );
+  await c.query(
+    "UPDATE tasks SET status='SUBMITTED',payload=$2,result_text=$3,version=version+1,updated_at=now() WHERE id=$1",
+    [t.id, JSON.stringify(payload), v.result_text],
+  );
+  await event(c, a, t.id, 'SUBMITTED', { submission_id: s.id, revision: s.revision });
+  if (t.reviewer_id)
+    await notify(c, t.reviewer_id, 'submission:' + s.id, 'Có công việc chờ duyệt', t.id);
+  return taskDetail(c, a, t.id);
 }
