@@ -1,5 +1,19 @@
 # Báo cáo kiểm thử — 06/11/2026
 
+## Nâng cấp tài khoản / mật khẩu / nhân sự — 07/11/2026
+
+Bản này có migration 006; [hướng dẫn và giới hạn](UPGRADE-20261107.md), [ma trận các ca gói nâng cấp](UPGRADE_ACCEPTANCE.csv).
+
+- Build TypeScript/server/Vite đạt trên Node24.
+- Unit/integration **61/61** với PostgreSQL17 trong database/DATA_DIR riêng. Có transaction tạo account/password/viewers, không đổi mật khẩu không tạo history, hai writer một409, idempotent retry, history before/after cùng account, key thiếu/sai, grant expiry/revocation/replay, metadata rename/disable, ngày Việt Nam tại ranh giới00:00, nhiều JOB/user link atomic, code nhân sự unique giữ0 đầu, scope HR/file/sensitive/export, ảnh hồ sơ riêng và tax/BHXH/bank mã hóa, XLSX text bắt đầu=, leave policy+session/grant invalidation và birthday5workingdays/dedupe/năm mới/29-2.
+- Playwright **20/20** desktop1440/mobile390 (18 hồi quy +2 luồng nâng cấp; chạy lại2luồng sau bổ sung ảnh/nhạy cảm): giữ các luồng task/report/LAN cũ; thêm account+2viewers qua search giữ tick, reveal/hide, staff update không checkbox, history Admin trước/sau, conflict409 lấy bản mới giữ input, employee3tabs/file/XLSX, tạo user2JOB liên kết profile và trạng thái kho mã hóa. Dùng server test riêng cho hai project nâng cấp để giữ nguyên rate-limit đăng nhập sản phẩm.
+- Đã restore backup vào DB `_test` khác rồi chạy006: fingerprint giữ nguyên11users,17tasks,5reportrevisions,1credentialversion/ciphertext,1accountgrant và1employeeprofile. Trigger immutable credential hoạt động sau backfill; cache reveal legacy còn0 response.secret/ciphertext.
+- Đã áp dụng006 trên DB ứng dụng cloud sau backup mới: so fingerprint giữ nguyên11users/17tasks/5reports/1platformaccount/1credentialversion/1accountgrant/1employeeprofile; kho mã hóa `ready`, cache plaintext reveal còn0. Health và trang chính trả200 ở0.0.0.0:3002, tiến trình giữ chạy.
+- `audit` không nhận insert mới, cả login/createuser/grant/reveal/bootstrap. Các response reveal mới không được lưu vào idempotency; cache mutate có authorization fingerprint và kiểm scope khi replay. Giữ business history riêng.
+- Lần kiểm tra ranh giới ngày bắt được ép kiểuDATE/AT TIME ZONE không rõ ràng; đã đổi sang timestamp không múi giờ tường minh rồi đổi từ Asia/Ho_Chi_Minh. Test UI dùng locator cụ thể cho thông báo thành công để không nhầm với trạng thái loading.
+- Chưa chạy native PostgreSQL/PowerShell/Task Scheduler/firewall hoặc LAN giữa2máy Windows thật. Q01/Q02/Q04 còn chờ, giữ scope cũ; policy gắn cờ không tự bật. Không dùng fixtures để tuyên bố nghiệp vụ/dữ liệu công ty đã nghiệm thu.
+
+
 ## Thiết kế lại theo file Fix lần 1 — 07/11/2026
 
 Bản cập nhật này có **migration 005**. Xem [phạm vi F01–F12 và hướng dẫn Windows](REDESIGN-20261107.md); thông tin “không có migration” ở mục sửa trang trắng bên dưới chỉ áp dụng commit 559c9ab cũ.

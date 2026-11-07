@@ -16,6 +16,7 @@ import {
   manages,
   management,
 } from './base.js';
+import { hrAccess, sensitiveAllowed } from './employees.js';
 import { taskAccess } from './tasks.js';
 export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
   const r = await one(
@@ -85,12 +86,33 @@ export function fileRoutes(api: API) {
       .object({
         task_id: z.uuid().optional(),
         record_id: z.uuid().optional(),
+        employee_id: z.uuid().optional(),
+        document_kind: z.string().trim().min(1).max(80).default('OTHER'),
+        classification: z.enum(['BASIC', 'SENSITIVE']).default('BASIC'),
         shared: z.enum(['true', 'false']).default('false'),
       })
       .parse(b.fields);
-    need(!!v.task_id !== !!v.record_id, 'Cần đúng một hồ sơ/task đính kèm', 422, 'VALIDATION');
+    need(
+      [v.task_id, v.record_id, v.employee_id].filter(Boolean).length === 1,
+      'Cần đúng một công việc hoặc hồ sơ đính kèm',
+      422,
+      'VALIDATION',
+    );
     let role = '';
-    if (v.task_id) {
+    if (v.employee_id) {
+      const e = await hrAccess(c, a, v.employee_id, true);
+      need(!e.archived_at, 'Hồ sơ đã lưu trữ', 409, 'STATE');
+      need(v.shared === 'false', 'Hồ sơ nhân sự không chia sẻ qua task', 422, 'VALIDATION');
+      need(
+        !['IDENTITY', 'PAYROLL', 'TAX', 'SOCIAL_INSURANCE'].includes(v.document_kind) ||
+          v.classification === 'SENSITIVE',
+        'Tài liệu định danh, thuế, BHXH và lương cần quyền hồ sơ nhạy cảm',
+        422,
+        'SENSITIVE_CLASSIFICATION',
+      );
+      if (v.classification === 'SENSITIVE') need(await sensitiveAllowed(c, a, e));
+      role = 'HR';
+    } else if (v.task_id) {
       const x = await taskAccess(c, a, v.task_id, true);
       need(x.owner || x.manager || (x.support && x.s?.status === 'ACCEPTED'));
       need(!['DONE', 'CANCELLED'].includes(x.t.status), 'Công việc đã đóng', 409, 'STATE');
@@ -122,7 +144,7 @@ export function fileRoutes(api: API) {
     await writeFile(join(dataDir, key), b.buffer, { mode: 0o600, flag: 'wx' });
     const f = await one(
       c,
-      'INSERT INTO assets(id,task_id,record_id,uploaded_by,role,filename,storage_key,size,sha256,mime,shared) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id,filename,size,sha256',
+      'INSERT INTO assets(id,task_id,record_id,uploaded_by,role,filename,storage_key,size,sha256,mime,shared,employee_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id,filename,size,sha256',
       [
         id,
         v.task_id || null,
@@ -137,21 +159,56 @@ export function fileRoutes(api: API) {
         hash(b.buffer),
         'application/octet-stream',
         v.shared === 'true',
+        v.employee_id || null,
       ],
     );
+    if (v.employee_id)
+      await c.query(
+        'INSERT INTO employee_documents(employee_id,asset_id,document_kind,classification) VALUES($1,$2,$3,$4)',
+        [v.employee_id, id, v.document_kind, v.classification],
+      );
     await audit(c, a, 'FILE_UPLOADED', 'asset', id);
     return f;
   });
   api('GET', '/assets/:id/download', async (c, a, b, q, p, reply) => {
     const f = await one(c, 'SELECT * FROM assets WHERE id=$1', [p.id]);
     need(f, 'Không tìm thấy tệp', 404, 'NOT_FOUND');
-    if (f.task_id) {
+    if (f.employee_id) {
+      const e = await hrAccess(c, a, f.employee_id);
+      const doc = await one(
+        c,
+        'SELECT classification FROM employee_documents WHERE asset_id=$1 AND employee_id=$2',
+        [f.id, e.id],
+      );
+      need(doc, 'Không tìm thấy tệp', 404, 'NOT_FOUND');
+      if (doc.classification === 'SENSITIVE') need(await sensitiveAllowed(c, a, e));
+    } else if (f.task_id) {
       const x = await taskAccess(c, a, f.task_id);
       need(x.owner || x.manager || (f.shared && x.support), 'Không tìm thấy tệp', 404, 'NOT_FOUND');
     } else await recordAccess(c, a, f.record_id);
     await audit(c, a, 'FILE_DOWNLOADED', 'asset', f.id);
     const buffer = await readFile(join(dataDir, f.storage_key));
     need(hash(buffer) === f.sha256, 'Tệp không khớp checksum', 500, 'FILE_INTEGRITY');
+    if (q.preview === 'photo' && f.employee_id) {
+      const doc = await one(
+        c,
+        "SELECT id FROM employee_documents WHERE asset_id=$1 AND classification='BASIC' AND document_kind='PHOTO'",
+        [f.id],
+      );
+      const ext = extname(f.filename).slice(1).toLowerCase();
+      need(
+        doc && ['png', 'jpg', 'jpeg', 'webp'].includes(ext) && sniff(ext, buffer),
+        'Không phải ảnh hồ sơ được phép',
+        422,
+        'PHOTO_INVALID',
+      );
+      reply.type(
+        ({ png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' } as any)[
+          ext
+        ],
+      );
+      return buffer;
+    }
     reply
       .type('application/octet-stream')
       .header(

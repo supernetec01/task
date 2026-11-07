@@ -1,0 +1,38 @@
+﻿ID,Module,Action,Expected
+ACC01,Account,Admin thêm account+password+2viewers,"Một transaction thành công,1account/1version; cả2user xem được"
+ACC02,Account,Thiếukey khi thêm account,503dễhiểu; không có metadata/password/share lưu nửa chừng
+ACC03,Account,Staffkhông đượcshare đoánID account/reveal,403/404; khôngmetadata/secret/ciphertext
+ACC04,Account,Staffđượcshare xem/copycurrent,Thànhcông; không tạo history hoặc genericaudit
+ACC05,Account,Staffupdatepasswordkhác,Currentmới và1version; actor/time từserver; old giữmãhóa
+ACC06,Account,Lưu cùngpassword,changedfalse; không cóversionmới
+ACC07,Account,2người cậpnhật cùngexpectedversion,"1success,1conflict409; khôngsilentsave"
+ACC08,Account,Retrycùngidempotencykey/body,Không tạo2version; cùngkey khácbody bịconflict
+ACC09,Account,Revokeviewer trong khiđangmở,Requestkếtiếp bịchặn; clearsecret; không dùngcacheđểlách
+ACC10,Account,Searchtrongcheckbox rồi lưu,Các tick ngoài bộlọc không bịmất; khôngduplicateuser vì2role
+ACC11,Account,Đổitênplatform/disableplatform,ID/account/history giữ; disabledkhôngchọncreate; không mấtquyền accountcũ
+ACC12,Account,Sửametadata khôngđổi secret,Không tạo passwordhistory giả; giữlegalentity
+PWD01,History,Admin lọcplatform/actor/dateVN,Đúngphạmvi; phântrang ổnđịnh; khôngISO/UUIDthô
+PWD02,History,Staffgọi history/list/detail/revealold,403/404; chỉcurrentđượcshare
+PWD03,History,Firstversion,Khôngcóoldpassword; showclear firstsave
+PWD04,History,Liênkếtpreviousversion khácaccount,Bịchặn; khôngđọcsecretaccountkhác
+PWD05,History,LOGIN/CREATEUSER/GRANT/VIEWCOPY,Không insertgenericusageaudit; khôngpasswordhistory
+PWD06,History,"Tạo/update task,report,review","Lịch sửnghiệpvụvẫngiữ, không bịtắtcùngaudit"
+PWD07,History,Đổipasswordwebsite,Argon2hash; khôngreadableoldnewhistory
+PWD08,History,"Restartbằngkeyổnđịnh, keysaivàmấtkey",Decryptđúngvớikeycũ; failan toànnếusai/mất; khôngautogen
+HR01,HR,MởNhânsự,Khôngcócandidate/application/interview/recruitmenthistory; khôngxóalegacyDB
+HR02,HR,TạoNVcode/name/joined/positions,Codeunique; >=1vịtrí; 1profile nhiềuvịtrí
+HR03,HR,Thêmrole chouserđãlink,Không nhânđôiprofile; vịtrí vàgrant khôngautosyncngầm
+HR04,HR,NVkhác đọcprofile/sensitive/file/export,Scopecheck; khônglộ sensitivefields trongGETthường
+HR05,HR,Nghỉviệc,Archive; khóauser/session/grants đúngquytrình; task/report/history giữ
+HR06,HR,Exportfilter/permission,XLSXthật; đúngfilter/scope; khôngfieldẩn; chốngformula
+HR07,HR,Dates/phase/type,Ngàyhợplệ; typeparttime/intern táchphase vàchuyênmôn
+HR08,HR,Sinhnhật5workingdays/workerretry,Respectcalendarpolicy;1notification; cácpolicychưachốtkhôngtựbật
+USR01,Users,Createuser2JOBroles,Atomicuser+2grants; giao diện khôngphảimởlạimỗirole
+USR02,Users,AdminSELF/JOBALL/Reviewerthường,422trướclưu; hướn dẫn dễ hiểu
+USR03,Users,Thu hồi1role/hếtrole,Chặnphầnroleđó; rolecònlạihoạtđộng; file/exportkiểmlại
+USR04,Users,Username/password11codepoints,Usernamekhôngemail hợp lệ;hashonly;khôngresetadmincũ
+UI01,UI,Desktop1440/mobile390/keyboard,Khôngtrànbody;focus/label/Esc/footer; khôngmấtform
+UI02,UI,API409/422/503/network,Giữinput; khôngdoubleclick; toastthànhcôngchỉsaukhiAPIđạt
+UI03,UI,Đổipersona prototype,StaffkhôngmenuAdmin/history; ghi rõmôphỏng khôngxácthựcthật
+RUN01,Run,Build/tests/migrate/nativePG17,Khôngphádata; nêurõtestrunvàgiớihạn
+RUN02,Run,Windowsstart/LAN3002,"0.0.0.0:3002,health/login/servergiữchạy; nhậppasswordẩn"

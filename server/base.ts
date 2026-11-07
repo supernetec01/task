@@ -140,10 +140,9 @@ export async function audit(
   id: string,
   detail: unknown = {},
 ) {
-  await c.query(
-    'INSERT INTO audit(actor_id,action,object_type,object_id,detail) VALUES($1,$2,$3,$4,$5)',
-    [a?.id || null, action, type, id, JSON.stringify(detail)],
-  );
+  // Generic usage collection retired by the 07/11 product decision. Keep the
+  // compatibility helper while callers migrate; business histories use their own tables.
+  return;
 }
 export async function notify(
   c: DB,

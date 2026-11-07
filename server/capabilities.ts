@@ -39,7 +39,7 @@ export async function capabilities(c: DB, a: Actor) {
       label: 'Quản trị',
       items: [
         ...(manager ? ['users'] : []),
-        ...(admin ? ['templates', 'settings', 'audit'] : []),
+        ...(admin ? ['templates', 'settings', 'history'] : []),
         'profile',
       ],
     },

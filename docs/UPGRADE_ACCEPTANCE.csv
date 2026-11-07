@@ -1,0 +1,38 @@
+id,status,evidence_or_limit
+ACC01,AUTOMATED_EXISTING_SCOPE,"tests/core.test.ts; tests/browser/upgrade.spec.ts; Q01/Q02/Q04 pending, existing role-bound account/HR scope retained"
+ACC02,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC03,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC04,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC05,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC06,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC07,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC08,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC09,AUTOMATED_EXISTING_SCOPE,"tests/core.test.ts; tests/browser/upgrade.spec.ts; Q01/Q02/Q04 pending, existing role-bound account/HR scope retained"
+ACC10,AUTOMATED_EXISTING_SCOPE,"tests/core.test.ts; tests/browser/upgrade.spec.ts; Q01/Q02/Q04 pending, existing role-bound account/HR scope retained"
+ACC11,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+ACC12,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD01,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD02,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD03,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD04,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD05,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD06,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD07,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+PWD08,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR01,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR02,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR03,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR04,AUTOMATED_EXISTING_SCOPE,"tests/core.test.ts; tests/browser/upgrade.spec.ts; Q01/Q02/Q04 pending, existing role-bound account/HR scope retained"
+HR05,AUTOMATED_WITH_POLICY_GATE,Fixture confirms immediate leave policy; production remains gated until Admin decision; future scheduling unsupported
+HR06,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR07,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+HR08,AUTOMATED_WITH_POLICY_GATE,"5 working days, dedupe, year boundary and leap date tested; real holidays/correction policy await Q09"
+USR01,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+USR02,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+USR03,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+USR04,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+UI01,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+UI02,AUTOMATED_SCOPE_COVERED,tests/core.test.ts; tests/browser/upgrade.spec.ts
+UI03,PROTOTYPE_ONLY,Persona selector is absent from production; real session/role menus tested separately
+RUN01,PARTIAL,Build/tests/PG17 Docker/restore migration rehearsed on Linux; native Windows PostgreSQL not run
+RUN02,PARTIAL,Startup and HTTP LAN browser context tested; Windows PowerShell/firewall/two-device LAN not run

@@ -15,7 +15,7 @@ import {
 import { createUser, migrate, bootstrapAdmin } from '../server/cli.js';
 import { seedTemplateMigration, snapshotLegacyTasks } from '../server/template-store.js';
 import { buildApp } from '../server/app.js';
-import { runJobs } from '../server/worker.js';
+import { runJobs, birthdayOccurrence } from '../server/worker.js';
 import { comparison } from '../server/reports.js';
 import ExcelJS from 'exceljs';
 const password = 'Integration-Test-Password-2026!';
@@ -89,6 +89,9 @@ before(async () => {
         ' RESTART IDENTITY CASCADE',
     );
     await seedTemplateMigration(c);
+    await c.query(
+      "INSERT INTO platforms(code,name,normalized_name) VALUES('TIKTOK','TikTok','tiktok'),('SHOPEE','Shopee','shopee')",
+    );
     await c.query(
       'INSERT INTO settings(key,value) VALUES(\'calendar\',\'{"holidays":[],"timezone":"Asia/Ho_Chi_Minh","version":1}\'),(\'policies\',\'{"assignment_boundary_confirmed":true,"report_week_confirmed":true,"deadline_reviewer_approval":true,"support_scope":"TEAM","birthday_policy_confirmed":false,"reopen_enabled":false}\')',
     );
@@ -683,11 +686,15 @@ test('AT-047..050 · metric missing vs zero, immutable revisions, overlap confli
   assert.equal((await request('ads', 'GET', '/metrics?kind=SALES')).status, 403);
 });
 test('AT-054 · probation starts once; event dedupe; no payroll field invented', async () => {
-  const e = await ok('hr', 'POST', '/employees', {
-    name: 'HR Test',
-    birthday: '1990-11-09',
-    recruiter_id: ids.hr,
-  });
+  const e = (
+    await pool.query(
+      "INSERT INTO employee_profiles(created_by,name,birthday,recruiter_id) VALUES($1,'HR Test','1990-11-09',$1) RETURNING id",
+      [ids.hr],
+    )
+  ).rows[0];
+  await pool.query(
+    "UPDATE settings SET value=jsonb_set(value,'{recruiter_reminders_confirmed}','true') WHERE key='policies'",
+  );
   await ok('hr', 'POST', '/employees/' + e.id + '/probation-start', {
     actual_start_date: '2026-11-01',
     expected_version: 1,
@@ -708,7 +715,11 @@ test('AT-054 · probation starts once; event dedupe; no payroll field invented',
 test('AT-056..058 · encrypted platform versions; history Admin only; reveal audit safe', async () => {
   const a = await ok('admin', 'POST', '/platform-accounts', {
     label: 'Test Account',
-    platform: 'TIKTOK',
+    platform_id: (await ok('admin', 'GET', '/platforms')).items.find(
+      (p: any) => p.name === 'TikTok',
+    ).id,
+    secret: 'Initial-Test-Only',
+    viewer_ids: [],
     login: 'demo-login',
     company: 'Test Co',
   });
@@ -722,7 +733,7 @@ test('AT-056..058 · encrypted platform versions; history Admin only; reveal aud
     secret,
     external_changed_confirmed: true,
     note: 'test',
-    expected_version: 1,
+    expected_version: a.version,
   });
   const r = await pool.query('SELECT ciphertext FROM credential_versions WHERE id=$1', [v.id]);
   assert(!r.rows[0].ciphertext.includes(secret));
@@ -742,8 +753,8 @@ test('AT-056..058 · encrypted platform versions; history Admin only; reveal aud
     (await ok('admin', 'POST', '/credential-versions/' + v.id + '/reveal', {})).secret,
     secret,
   );
-  const audit = await ok('admin', 'GET', '/audit');
-  assert(!JSON.stringify(audit).includes(secret));
+  assert.equal((await request('admin', 'GET', '/audit')).status, 410);
+  assert.equal(Number((await pool.query('SELECT count(*) FROM audit')).rows[0].count), 0);
 });
 test('AT-059..063 · missing approval config blocks; quote-only never monetary approval; reapproval on edit', async () => {
   const body = {
@@ -1288,6 +1299,8 @@ test('Username admin bootstrap accepts exactly 11 characters, hashes secret and 
     url: '/api/v1/users',
     headers,
     payload: {
+      job_grants: [{ role: 'CONTENT' }],
+      access_grant: { role: 'EMPLOYEE', scope: 'SELF' },
       username: 'username_only',
       name: 'No email needed',
       password: secret,
@@ -1597,6 +1610,744 @@ test('F12 synthetic · overview/daily and period unique stay separate without at
   assert.equal(data.total_gmv, undefined);
   assert.equal(data.employee_gmv, undefined);
   assert.equal((await request('sales', 'GET', '/metrics?kind=VIDEO')).status, 403);
+});
+test('ACC01..08/PWD01..04 · atomic sharing, exact secret, no-change, concurrent writers and immutable before/after history', async () => {
+  const platform = await ok('admin', 'POST', '/platforms', { name: 'Nền tảng kiểm thử' });
+  const initial = ' short with spaces ';
+  const a = await ok('admin', 'POST', '/platform-accounts', {
+    platform_id: platform.id,
+    label: 'Tài khoản nâng cấp',
+    login: 'login.test',
+    company: 'Independent entity',
+    note: 'Metadata',
+    secret: initial,
+    viewer_ids: [ids.employee, ids.support],
+  });
+  ids.upgradeAccount = a.id;
+  ids.upgradePlatform = platform.id;
+  assert(a.has_password);
+  assert.equal(a.viewers.length, 2);
+  assert.equal(
+    (await ok('employee', 'POST', '/platform-accounts/' + a.id + '/reveal', {})).secret,
+    initial,
+  );
+  const listed = await ok('employee', 'GET', '/platform-accounts');
+  assert(!JSON.stringify(listed).includes(initial));
+  assert(!JSON.stringify(listed).includes('ciphertext'));
+  assert(listed.items.every((item: any) => item.viewers === undefined));
+  assert.equal((await request('outside', 'GET', '/platform-accounts/' + a.id)).status, 404);
+  assert.equal(
+    (await request('outside', 'POST', '/platform-accounts/' + a.id + '/reveal', {})).status,
+    404,
+  );
+  const first = (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items[0];
+  assert.equal(first.has_previous, false);
+  assert.equal(
+    (
+      await request('admin', 'POST', '/credential-history/' + first.id + '/reveal', {
+        which: 'before',
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    Number(
+      (
+        await pool.query(
+          "SELECT count(*) FROM idempotency WHERE response ? 'secret' OR response ? 'ciphertext'",
+        )
+      ).rows[0].count,
+    ),
+    0,
+  );
+  const same = await ok('employee', 'POST', '/platform-accounts/' + a.id + '/versions', {
+    secret: initial,
+    expected_version: a.version,
+  });
+  assert.equal(same.changed, false);
+  assert.equal(
+    (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items.length,
+    1,
+  );
+  const concurrent = await Promise.all(
+    ['employee', 'support'].map((who) =>
+      request(who, 'POST', '/platform-accounts/' + a.id + '/versions', {
+        secret: 'Updated ' + who,
+        expected_version: a.version,
+      }),
+    ),
+  );
+  assert.deepEqual(concurrent.map((r) => r.status).sort(), [200, 409]);
+  const latest = (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items[0];
+  assert.equal(latest.has_previous, true);
+  assert.equal(latest.revision, 2);
+  assert.equal(
+    (await ok('admin', 'POST', '/credential-history/' + latest.id + '/reveal', { which: 'before' }))
+      .secret,
+    initial,
+  );
+  for (const path of [
+    '/credential-history',
+    '/credential-history/' + latest.id,
+    '/platform-accounts/' + a.id + '/history',
+  ])
+    assert.equal((await request('employee', 'GET', path)).status, 403);
+  assert.equal(
+    (
+      await request('employee', 'POST', '/credential-history/' + latest.id + '/reveal', {
+        which: 'before',
+      })
+    ).status,
+    403,
+  );
+  const current = await ok('admin', 'GET', '/platform-accounts/' + a.id),
+    key = randomUUID(),
+    body = { secret: 'Retry stable test', expected_version: current.version };
+  ids.upgradeWriteKey = key;
+  ids.upgradeWriteVersion = String(current.version);
+  const retry = await Promise.all([
+    ok('employee', 'POST', '/platform-accounts/' + a.id + '/versions', body, key),
+    ok('employee', 'POST', '/platform-accounts/' + a.id + '/versions', body, key),
+  ]);
+  assert.equal(retry[0].id, retry[1].id);
+  assert.equal(
+    (
+      await request(
+        'employee',
+        'POST',
+        '/platform-accounts/' + a.id + '/versions',
+        { ...body, secret: 'Different' },
+        key,
+      )
+    ).status,
+    409,
+  );
+  await assert.rejects(
+    () => pool.query('UPDATE credential_versions SET note=$2 WHERE id=$1', [latest.id, 'mutate']),
+    /immutable/,
+  );
+  const other = await ok('admin', 'POST', '/platform-accounts', {
+    platform_id: platform.id,
+    label: 'Other account',
+    login: 'other',
+    company: 'Other entity',
+    secret: 'short',
+    viewer_ids: [],
+  });
+  const cv = await pool.query(
+    'SELECT current_credential_version_id FROM platform_accounts WHERE id=$1',
+    [a.id],
+  );
+  await assert.rejects(
+    () =>
+      pool.query('UPDATE platform_accounts SET current_credential_version_id=$2 WHERE id=$1', [
+        other.id,
+        cv.rows[0].current_credential_version_id,
+      ]),
+    /foreign key/,
+  );
+});
+test('ACC02/PWD08 · absent or wrong key fails safely and rolls back all account data', async () => {
+  const saved = process.env.VAULT_KEY;
+  const count = Number((await pool.query('SELECT count(*) FROM platform_accounts')).rows[0].count);
+  try {
+    delete process.env.VAULT_KEY;
+    const r = await request('admin', 'POST', '/platform-accounts', {
+      platform_id: ids.upgradePlatform,
+      label: 'No key',
+      login: 'x',
+      company: 'A',
+      secret: 'x',
+      viewer_ids: [ids.employee],
+    });
+    assert.equal(r.status, 503);
+    assert.equal(r.data.code, 'CREDENTIAL_STORAGE_UNAVAILABLE');
+    assert.equal(
+      (await ok('admin', 'GET', '/settings/credential-storage-status')).state,
+      'missing_key',
+    );
+    assert.equal(
+      Number((await pool.query('SELECT count(*) FROM platform_accounts')).rows[0].count),
+      count,
+    );
+    process.env.VAULT_KEY = '11'.repeat(32);
+    assert.equal(
+      (await ok('admin', 'GET', '/settings/credential-storage-status')).state,
+      'decrypt_unavailable',
+    );
+    assert.equal(
+      (
+        await request(
+          'employee',
+          'POST',
+          '/platform-accounts/' + ids.upgradeAccount + '/reveal',
+          {},
+        )
+      ).status,
+      503,
+    );
+  } finally {
+    process.env.VAULT_KEY = saved;
+  }
+  assert.equal(
+    (await ok('employee', 'POST', '/platform-accounts/' + ids.upgradeAccount + '/reveal', {}))
+      .secret,
+    'Retry stable test',
+  );
+});
+test('ACC09..12 · batch viewers atomic, role expiry, renamed/disabled platform and metadata retain history/entity', async () => {
+  let a = await ok('admin', 'GET', '/platform-accounts/' + ids.upgradeAccount);
+  let count = (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items.length;
+  const invalid = await request('admin', 'PUT', '/platform-accounts/' + a.id + '/viewers', {
+    viewer_ids: [ids.employee, randomUUID()],
+    expected_sharing_version: a.sharing_version,
+  });
+  assert.equal(invalid.status, 422);
+  assert.equal((await ok('support', 'GET', '/platform-accounts/' + a.id)).id, a.id);
+  a = await ok('admin', 'PUT', '/platform-accounts/' + a.id + '/viewers', {
+    viewer_ids: [ids.employee],
+    expected_sharing_version: a.sharing_version,
+  });
+  assert.equal(
+    (await request('support', 'POST', '/platform-accounts/' + a.id + '/reveal', {})).status,
+    404,
+  );
+  assert.equal(
+    (
+      await request('admin', 'PUT', '/platform-accounts/' + a.id + '/viewers', {
+        viewer_ids: [ids.support],
+        expected_sharing_version: a.sharing_version - 1,
+      })
+    ).status,
+    409,
+  );
+  const p = (await ok('admin', 'GET', '/platforms')).items.find(
+    (p: any) => p.id === ids.upgradePlatform,
+  );
+  await ok('admin', 'PATCH', '/platforms/' + p.id, {
+    name: 'Nền tảng đổi tên',
+    enabled: false,
+    sort_order: 1,
+    expected_version: p.version,
+  });
+  assert.equal(
+    (await ok('employee', 'GET', '/platform-accounts/' + a.id)).platform.name,
+    'Nền tảng đổi tên',
+  );
+  assert.equal(
+    (
+      await request('admin', 'POST', '/platform-accounts', {
+        platform_id: p.id,
+        label: 'Disabled',
+        login: 'x',
+        company: 'A',
+        secret: 'short',
+        viewer_ids: [],
+      })
+    ).status,
+    422,
+  );
+  a = await ok('admin', 'PATCH', '/platform-accounts/' + a.id, {
+    platform_id: p.id,
+    label: 'Tên mới',
+    login: 'new.login',
+    note: 'Metadata only',
+    expected_version: a.version,
+  });
+  assert.equal(a.company, 'Independent entity');
+  assert.equal(
+    (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items.length,
+    count,
+  );
+  assert.equal(
+    (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items[0].account_snapshot
+      .label,
+    'Tài khoản nâng cấp',
+  );
+  await pool.query(
+    "UPDATE grants SET valid_to=now()-interval '1 second' WHERE user_id=$1 AND kind='JOB' AND role='CONTENT'",
+    [ids.employee],
+  );
+  assert.equal((await request('employee', 'GET', '/platform-accounts/' + a.id)).status, 404);
+  assert.equal(
+    (
+      await request(
+        'employee',
+        'POST',
+        '/platform-accounts/' + a.id + '/versions',
+        { secret: 'Retry stable test', expected_version: Number(ids.upgradeWriteVersion) },
+        ids.upgradeWriteKey,
+      )
+    ).status,
+    403,
+  );
+  await pool.query('UPDATE grants SET valid_to=NULL WHERE user_id=$1', [ids.employee]);
+});
+test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejects invalid scope/reviewer and duplicates', async () => {
+  const profile = await ok('admin', 'POST', '/employees', {
+    employee_code: '00017',
+    name: 'Nhân viên liên kết',
+    joined_on: '2026-11-01',
+    positions: ['CONTENT', 'DESIGNER'],
+    phase: 'PROBATION',
+    employment_type: 'PART_TIME',
+    team_id: ids.team,
+  });
+  ids.upgradeEmployee = profile.id;
+  const body = {
+    username: 'multi_upgrade',
+    name: profile.name,
+    password: 'Multi-Role-Test-2026!',
+    employee_id: profile.id,
+    team_id: ids.team,
+    manager_id: ids.manager,
+    reviewer_id: ids.manager,
+    job_grants: [{ role: 'CONTENT' }, { role: 'DESIGNER' }],
+    access_grant: { role: 'EMPLOYEE', scope: 'SELF' },
+  };
+  assert.equal(
+    (
+      await request('admin', 'POST', '/users', {
+        ...body,
+        access_grant: { role: 'ADMIN', scope: 'SELF' },
+      })
+    ).status,
+    422,
+  );
+  assert.equal(
+    (await request('admin', 'POST', '/users', { ...body, reviewer_id: ids.employee })).status,
+    422,
+  );
+  assert.equal(
+    Number(
+      (await pool.query("SELECT count(*) FROM users WHERE username='multi_upgrade'")).rows[0].count,
+    ),
+    0,
+  );
+  const u = await ok('admin', 'POST', '/users', body);
+  ids.upgradeUser = u.id;
+  assert.equal(u.permissions.grants.filter((g: any) => g.kind === 'JOB').length, 2);
+  assert.equal((await ok('admin', 'GET', '/employees/' + profile.id)).user_id, u.id);
+  assert.equal(
+    Number(
+      (await pool.query('SELECT count(*) FROM employee_profiles WHERE user_id=$1', [u.id])).rows[0]
+        .count,
+    ),
+    1,
+  );
+  assert.equal(
+    (await request('admin', 'POST', '/users', { ...body, username: 'duplicate_link' })).status,
+    409,
+  );
+  assert.equal(
+    (
+      await request('admin', 'POST', '/role-grants', {
+        user_id: u.id,
+        kind: 'JOB',
+        role: 'HR',
+        scope: 'ALL',
+        team_id: null,
+        reason: 'Invalid',
+      })
+    ).status,
+    422,
+  );
+  const perm = await ok('admin', 'POST', '/users/' + u.id + '/grants', {
+    job_grants: [{ role: 'HR' }],
+    reason: 'Bổ sung HR',
+    expected_permission_version: u.permissions.permission_version,
+  });
+  assert.equal(perm.grants.filter((g: any) => g.kind === 'JOB').length, 3);
+  assert.equal(
+    (
+      await request('admin', 'POST', '/users/' + u.id + '/grants', {
+        job_grants: [{ role: 'ADS' }],
+        reason: 'Stale',
+        expected_permission_version: u.permissions.permission_version,
+      })
+    ).status,
+    409,
+  );
+  const codeDuplicate = await request('admin', 'POST', '/employees', {
+    employee_code: '00017',
+    name: 'Không tạo trùng',
+    joined_on: '2026-11-01',
+    positions: ['CONTENT'],
+    phase: 'OFFICIAL',
+    employment_type: 'FULL_TIME',
+  });
+  assert.equal(codeDuplicate.status, 409);
+  const changed = await ok('admin', 'PATCH', '/employees/' + profile.id, {
+    employee_code: '00017',
+    name: profile.name,
+    joined_on: '2026-11-01',
+    positions: ['CONTENT', 'HR'],
+    phase: 'PROBATION',
+    employment_type: 'PART_TIME',
+    team_id: ids.team,
+    user_id: u.id,
+    expected_version: 2,
+  });
+  assert.equal(changed.positions.filter((p: any) => !p.effective_to).length, 2);
+  assert(changed.positions.some((p: any) => p.position_code === 'DESIGNER' && p.effective_to));
+  const grants = (
+    await pool.query(
+      "SELECT role FROM grants WHERE user_id=$1 AND kind='JOB' AND revoked_at IS NULL",
+      [u.id],
+    )
+  ).rows.map((r) => r.role);
+  assert(grants.includes('DESIGNER'));
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.121',
+    payload: { username: 'multi_upgrade', password: 'Multi-Role-Test-2026!' },
+  });
+  assert.equal(login.statusCode, 200);
+  clients.roleUpgrade = {
+    cookie: login.headers['set-cookie']?.toString().split(';')[0],
+    csrf: login.json().csrf,
+  };
+  const account = await ok('admin', 'GET', '/platform-accounts/' + ids.upgradeAccount);
+  await ok('admin', 'PUT', '/platform-accounts/' + account.id + '/viewers', {
+    viewer_ids: [ids.employee, u.id],
+    viewer_roles: { [u.id]: ['CONTENT'] },
+    expected_sharing_version: account.sharing_version,
+  });
+  assert.equal((await ok('roleUpgrade', 'GET', '/platform-accounts/' + account.id)).id, account.id);
+  const contentGrant = perm.grants.find((g: any) => g.kind === 'JOB' && g.role === 'CONTENT');
+  await ok('admin', 'POST', '/role-grants/' + contentGrant.id + '/revoke', {
+    reason: 'Thu hồi riêng chuyên môn Content',
+  });
+  assert.equal(
+    (await request('roleUpgrade', 'GET', '/platform-accounts/' + account.id)).status,
+    404,
+  );
+  assert((await ok('roleUpgrade', 'GET', '/me')).grants.some((g: any) => g.role === 'DESIGNER'));
+  assert.equal(
+    (
+      await ok('roleUpgrade', 'POST', '/tasks', {
+        title: 'Vai trò thiết kế vẫn hoạt động',
+        role: 'DESIGNER',
+        due_at: new Date(Date.now() + 86400e3).toISOString(),
+      })
+    ).role,
+    'DESIGNER',
+  );
+});
+test('HR01/04/06/07 · scoped personnel/files/export, no recruitment UI types, safe workbook and legacy preserved', async () => {
+  const conf = await ok('admin', 'GET', '/modules');
+  assert(!Object.values(conf.kinds).some((k: any) => k.module === 'hr'));
+  const legacy = await pool.query(
+    "SELECT count(*) FROM employee_profiles WHERE employment_state='CANDIDATE'",
+  );
+  assert(Number(legacy.rows[0].count) >= 0);
+  assert.equal((await request('employee', 'GET', '/employees/' + ids.upgradeEmployee)).status, 403);
+  assert.equal((await request('hr', 'GET', '/employees/' + ids.upgradeEmployee)).status, 404);
+  const e = await ok('admin', 'GET', '/employees/' + ids.upgradeEmployee);
+  assert.equal(e.sensitive_cipher, undefined);
+  assert.equal(e.candidate_id, undefined);
+  assert.equal(e.employment_type, 'PART_TIME');
+  const file = await multipartRequest(
+    'admin',
+    '/assets',
+    { employee_id: e.id, document_kind: 'CONTRACT', classification: 'BASIC' },
+    'personnel.txt',
+    Buffer.from('private personnel document'),
+  );
+  assert.equal(file.statusCode, 200, file.body);
+  assert.equal(
+    (await request('employee', 'GET', '/assets/' + file.json().id + '/download')).status,
+    403,
+  );
+  assert.equal((await request('hr', 'GET', '/assets/' + file.json().id + '/download')).status, 404);
+  const badClass = await multipartRequest(
+    'admin',
+    '/assets',
+    { employee_id: e.id, document_kind: 'IDENTITY', classification: 'BASIC' },
+    'identity.txt',
+    Buffer.from('sensitive'),
+  );
+  assert.equal(badClass.statusCode, 422);
+  const shared = await multipartRequest(
+    'admin',
+    '/assets',
+    { employee_id: e.id, shared: 'true' },
+    'not-task.txt',
+    Buffer.from('private'),
+  );
+  assert.equal(shared.statusCode, 422);
+  assert.equal((await request('employee', 'GET', '/employees/export')).status, 403);
+  const exported = await request('admin', 'GET', '/employees/export?search=00017');
+  assert.equal(exported.status, 200);
+  const w = new ExcelJS.Workbook();
+  await w.xlsx.load(exported.r.rawPayload as any);
+  const sheet = w.worksheets[0];
+  assert.equal(sheet.rowCount, 2);
+  assert.equal(sheet.getCell('A2').value, '00017');
+  sheet.eachRow((r) => r.eachCell((c) => assert.notEqual(c.type, ExcelJS.ValueType.Formula)));
+  const invalid = await request('admin', 'PATCH', '/employees/' + e.id, {
+    ...e,
+    phase: 'PROBATION',
+    positions: ['CONTENT'],
+    joined_on: '2026-11-01',
+    contract_date: '2026-11-02',
+    contract_end: '2026-11-01',
+    expected_version: e.version,
+  });
+  assert.equal(invalid.status, 422);
+  await ok('admin', 'PATCH', '/employees/' + e.id, {
+    ...e,
+    name: '=HYPERLINK("https://example.invalid")',
+    phase: 'PROBATION',
+    positions: e.positions.filter((p: any) => !p.effective_to).map((p: any) => p.position_code),
+    expected_version: e.version,
+  });
+  const dangerous = await request('admin', 'GET', '/employees/export?search=00017');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(dangerous.r.rawPayload as any);
+  assert.equal(wb.worksheets[0].getCell('B2').type, ExcelJS.ValueType.String);
+  assert(String(wb.worksheets[0].getCell('B2').value).startsWith('='));
+});
+test('PWD01 · Vietnamese day boundaries and actor filters paginate without plaintext', async () => {
+  const a = (
+    await pool.query(
+      "INSERT INTO platform_accounts(label,platform,platform_id,login,company) VALUES('Date fixture','Legacy',$1,'date.fixture','Synthetic') RETURNING id",
+      [ids.upgradePlatform],
+    )
+  ).rows[0];
+  const { cipher } = await import('../server/base.js');
+  const first = (
+    await pool.query(
+      'INSERT INTO credential_versions(account_id,ciphertext,actor_id,revision,metadata_snapshot,created_at) VALUES($1,$2,$3,1,\'{"label":"Date fixture"}\',\'2026-11-06T16:59:59Z\') RETURNING id',
+      [a.id, cipher('Date-Only-Test'), ids.employee],
+    )
+  ).rows[0];
+  const second = (
+    await pool.query(
+      'INSERT INTO credential_versions(account_id,ciphertext,actor_id,revision,previous_version_id,metadata_snapshot,created_at) VALUES($1,$2,$3,2,$4,\'{"label":"Date fixture"}\',\'2026-11-06T17:00:00Z\') RETURNING id',
+      [a.id, cipher('Date-Only-Test-2'), ids.admin, first.id],
+    )
+  ).rows[0];
+  await pool.query('UPDATE platform_accounts SET current_credential_version_id=$2 WHERE id=$1', [
+    a.id,
+    second.id,
+  ]);
+  const localDay = await ok(
+    'admin',
+    'GET',
+    '/credential-history?account_id=' + a.id + '&from=2026-11-07&to=2026-11-07',
+  );
+  assert.equal(localDay.items.length, 1);
+  assert.equal(localDay.items[0].id, second.id);
+  const previous = await ok(
+    'admin',
+    'GET',
+    '/credential-history?account_id=' + a.id + '&actor_id=' + ids.employee,
+  );
+  assert.equal(previous.items.length, 1);
+  assert.equal(previous.items[0].id, first.id);
+  const page = await ok('admin', 'GET', '/credential-history?account_id=' + a.id + '&limit=1');
+  assert.equal(page.items.length, 1);
+  assert(page.next_cursor);
+  assert.equal(
+    (
+      await ok(
+        'admin',
+        'GET',
+        '/credential-history?account_id=' + a.id + '&limit=1&cursor=' + page.next_cursor,
+      )
+    ).items[0].id,
+    first.id,
+  );
+  assert(!JSON.stringify(localDay).includes('Date-Only-Test'));
+});
+test('HR08 · birthday dates cross year boundaries and skip invalid February 29', () => {
+  assert.equal(birthdayOccurrence('1990-01-02', '2026-12-28'), '2027-01-02');
+  assert.equal(birthdayOccurrence('2000-02-29', '2026-11-07'), null);
+  assert.equal(birthdayOccurrence('2000-02-29', '2028-02-20'), '2028-02-29');
+  assert.equal(workingDate('2027-01-02', -5, []), '2026-12-28');
+});
+test('HR08 · five working days birthday reminder is gated and retry sends once', async () => {
+  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10),
+    birthday = workingDate(today, 5, []);
+  const e = (
+    await pool.query(
+      "INSERT INTO employee_profiles(created_by,name,birthday,employment_state) VALUES($1,'Sinh nhật fixture',$2,'OFFICIAL') RETURNING id",
+      [ids.hr, '1990' + birthday.slice(4)],
+    )
+  ).rows[0];
+  await pool.query(
+    "UPDATE settings SET value=jsonb_set(value,'{birthday_policy_confirmed}','false') WHERE key='policies'",
+  );
+  await runJobs();
+  const key = 'birthday:' + e.id + ':' + today.slice(0, 4);
+  assert.equal(
+    Number(
+      (await pool.query('SELECT count(*) FROM notifications WHERE event_key=$1', [key])).rows[0]
+        .count,
+    ),
+    0,
+  );
+  await pool.query(
+    "UPDATE settings SET value=jsonb_set(value,'{birthday_policy_confirmed}','true') WHERE key='policies'",
+  );
+  await runJobs();
+  await runJobs();
+  assert.equal(
+    Number(
+      (await pool.query('SELECT count(*) FROM notifications WHERE event_key=$1', [key])).rows[0]
+        .count,
+    ),
+    1,
+  );
+  await pool.query(
+    "UPDATE settings SET value=jsonb_set(value,'{birthday_policy_confirmed}','false') WHERE key='policies'",
+  );
+});
+test('HR profile · private photo and tax/insurance/bank fields stay scoped and encrypted', async () => {
+  let e = await ok('admin', 'GET', '/employees/' + ids.upgradeEmployee);
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const upload = await multipartRequest(
+    'admin',
+    '/assets',
+    { employee_id: e.id, document_kind: 'PHOTO', classification: 'BASIC' },
+    'profile.png',
+    png,
+  );
+  assert.equal(upload.statusCode, 200, upload.body);
+  e = await ok('admin', 'PUT', '/employees/' + e.id + '/photo', {
+    asset_id: upload.json().id,
+    expected_version: e.version,
+  });
+  assert.equal(e.contact.photo_asset_id, upload.json().id);
+  const preview = await request(
+    'admin',
+    'GET',
+    '/assets/' + upload.json().id + '/download?preview=photo',
+  );
+  assert.match(String(preview.r.headers['content-type']), /image\/png/);
+  assert(preview.r.rawPayload.equals(png));
+  assert.equal(
+    (await request('employee', 'GET', '/assets/' + upload.json().id + '/download?preview=photo'))
+      .status,
+    403,
+  );
+  const sensitive = {
+    salary: 'Private salary fixture',
+    identity_document: 'Private identity fixture',
+    tax_id: '00112233',
+    social_insurance: '009988',
+    bank_name: 'Synthetic Bank',
+    bank_account: '000001234',
+    notes: 'Confidential fixture only',
+  };
+  await ok('admin', 'PUT', '/employees/' + e.id + '/sensitive', {
+    data: sensitive,
+    expected_version: e.version,
+  });
+  const normal = await ok('admin', 'GET', '/employees/' + e.id);
+  for (const value of Object.values(sensitive)) assert(!JSON.stringify(normal).includes(value));
+  assert.deepEqual((await ok('admin', 'GET', '/employees/' + e.id + '/sensitive')).data, sensitive);
+  const stored = (
+    await pool.query('SELECT sensitive_cipher FROM employee_profiles WHERE id=$1', [e.id])
+  ).rows[0].sensitive_cipher;
+  assert(!stored.includes(sensitive.bank_account));
+  assert.equal((await request('employee', 'GET', '/employees/' + e.id + '/sensitive')).status, 403);
+});
+test('HR05/PWD05..07 · gated leave invalidates actual sessions/grants, preserves histories, no generic usage collection', async () => {
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.120',
+    payload: { username: 'multi_upgrade', password: 'Multi-Role-Test-2026!' },
+  });
+  assert.equal(login.statusCode, 200);
+  clients.multiUpgrade = {
+    cookie: login.headers['set-cookie']?.toString().split(';')[0],
+    csrf: login.json().csrf,
+  };
+  const e = await ok('admin', 'GET', '/employees/' + ids.upgradeEmployee);
+  const today = new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10);
+  const body = {
+    left_on: today,
+    reason: 'Đã bàn giao có xác nhận',
+    confirm_disable: true,
+    expected_version: e.version,
+  };
+  assert.equal((await request('admin', 'POST', '/employees/' + e.id + '/leave', body)).status, 422);
+  assert.equal(
+    (
+      await request('admin', 'POST', '/employees/' + e.id + '/employment', {
+        state: 'LEFT',
+        date: today,
+        reason: 'Không được bỏ qua bàn giao',
+        expected_version: e.version,
+      })
+    ).status,
+    410,
+  );
+  await pool.query(
+    "UPDATE settings SET value=jsonb_set(value,'{employee_leave_confirmed}','true') WHERE key='policies'",
+  );
+  const taskCount = Number((await pool.query('SELECT count(*) FROM tasks')).rows[0].count),
+    historyCount = Number(
+      (await pool.query('SELECT count(*) FROM credential_versions')).rows[0].count,
+    );
+  await ok('admin', 'POST', '/employees/' + e.id + '/leave', body);
+  assert.equal((await request('multiUpgrade', 'GET', '/me')).status, 401);
+  assert.equal(
+    Number(
+      (
+        await pool.query('SELECT count(*) FROM grants WHERE user_id=$1 AND revoked_at IS NULL', [
+          ids.upgradeUser,
+        ])
+      ).rows[0].count,
+    ),
+    0,
+  );
+  assert((await ok('admin', 'GET', '/employees/' + e.id)).archived_at);
+  assert(
+    (await ok('admin', 'GET', '/employees?status=archived')).items.some(
+      (e: any) => e.id === ids.upgradeEmployee,
+    ),
+  );
+  assert.equal(Number((await pool.query('SELECT count(*) FROM tasks')).rows[0].count), taskCount);
+  assert.equal(
+    Number((await pool.query('SELECT count(*) FROM credential_versions')).rows[0].count),
+    historyCount,
+  );
+  assert.equal(Number((await pool.query('SELECT count(*) FROM audit')).rows[0].count), 0);
+  assert.equal((await request('admin', 'GET', '/audit')).status, 410);
+});
+test('Settings · typed checklists preserve policy, missing legacy flags stay disabled and decisions are immutable', async () => {
+  const before = (await ok('admin', 'GET', '/settings')).items.find(
+    (p: any) => p.key === 'policies',
+  );
+  await ok('admin', 'PUT', '/settings/policies', {
+    value: { ...before.value, employee_document_checklists: { PART_TIME: ['CONTRACT'] } },
+    expected_version: before.version,
+    reason: 'Checklist được người quản lý chốt trong test',
+  });
+  const after = (await ok('admin', 'GET', '/settings')).items.find(
+    (p: any) => p.key === 'policies',
+  );
+  assert.equal(after.value.report_week_confirmed, before.value.report_week_confirmed);
+  assert.equal(after.value.retention_confirmed, false);
+  assert.deepEqual(after.value.employee_document_checklists, { PART_TIME: ['CONTRACT'] });
+  const entry = (
+    await pool.query("SELECT * FROM settings_history WHERE key='policies' ORDER BY id DESC LIMIT 1")
+  ).rows[0];
+  assert.equal(entry.actor_id, ids.admin);
+  assert.equal(entry.reason, 'Checklist được người quản lý chốt trong test');
+  await assert.rejects(
+    () => pool.query('DELETE FROM settings_history WHERE id=$1', [entry.id]),
+    /immutable/,
+  );
+  assert.equal(Number((await pool.query('SELECT count(*) FROM audit')).rows[0].count), 0);
 });
 test('Disabled account/session and logout deny subsequent API', async () => {
   await pool.query('UPDATE users SET active=false WHERE id=$1', [ids.outside]);

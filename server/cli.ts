@@ -91,10 +91,7 @@ export async function bootstrapAdmin(password?: string) {
         'INSERT INTO grants(user_id,kind,role,scope,team_id,reason) VALUES($1,$2,$3,$4,$5,$6)',
         [u.id, kind, role, scope, team.id, 'ADMIN_BOOTSTRAP'],
       );
-    await c.query(
-      "INSERT INTO audit(actor_id,action,object_type,object_id) VALUES($1,'ADMIN_BOOTSTRAPPED','user',$2)",
-      [u.id, u.id],
-    );
+
     return { created: true, id: u.id };
   });
 }

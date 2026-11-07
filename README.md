@@ -4,6 +4,10 @@
 
 Đây là bản bàn giao **để kiểm thử nội bộ**, không đồng nghĩa đã nghiệm thu trên máy Windows/LAN của công ty. Xem [báo cáo kiểm thử](docs/TESTING.md), [ma trận yêu cầu](docs/REQUIREMENTS.csv), [chính sách còn mở](docs/DECISIONS.md) và [hướng dẫn Windows](docs/WINDOWS.md).
 
+## Nâng cấp tài khoản và nhân sự
+
+Tài khoản nền tảng, lịch sử mật khẩu Admin, hồ sơ nhân viên và cấp nhiều chuyên môn đã được tích hợp theo gói nâng cấp mới. Bản này có **migration 006**, cần sao lưu và chạy `npm run upgrade:preview` trước migrate. Xem [chức năng, chính sách còn chờ và lệnh cập nhật Windows](docs/UPGRADE-20261107.md).
+
 ## Cập nhật giao diện 07/11
 
 Đã thêm drawer công việc ba tab, tạo việc kèm tài liệu, cập nhật/nộp kết quả chung, trao đổi riêng và quản trị mẫu có phiên bản. Bản này **có migration 005**; người đang dùng cần sao lưu rồi chạy `npm run migrate` sau build. Xem [phạm vi sửa và lệnh cập nhật Windows](docs/REDESIGN-20261107.md).

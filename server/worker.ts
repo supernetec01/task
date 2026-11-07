@@ -14,6 +14,19 @@ import {
 } from './base.js';
 import { logStream } from './logging.js';
 import { createTask } from './tasks.js';
+export function birthdayOccurrence(birthDate: string, today: string) {
+  for (const year of [Number(today.slice(0, 4)), Number(today.slice(0, 4)) + 1]) {
+    const day = String(year) + birthDate.slice(4);
+    const parsed = new Date(day + 'T12:00:00Z');
+    if (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().slice(0, 10) === day &&
+      day >= today
+    )
+      return day;
+  }
+  return null;
+}
 export async function runJobs() {
   await tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock_shared(3002003)');
@@ -85,15 +98,15 @@ export async function runJobs() {
       for (const e of employees) {
         const b =
           e.birthday instanceof Date ? localDate(e.birthday) : String(e.birthday).slice(0, 10);
-        const birthday = today.slice(0, 4) + b.slice(4);
-        if (new Date(birthday + 'T12:00:00Z').toISOString().slice(0, 10) !== birthday) continue;
+        const birthday = birthdayOccurrence(b, today);
+        if (!birthday) continue;
         if (workingDate(birthday, -5, calendar.holidays) !== today) continue;
         const creator = await actor(c, e.created_by).catch(() => null);
         if (!creator || !hasJob(creator, 'HR')) continue;
         await notify(
           c,
           e.created_by,
-          `birthday:${e.id}:${today.slice(0, 4)}`,
+          `birthday:${e.id}:${birthday.slice(0, 4)}`,
           'Có sinh nhật nhân viên sau 5 ngày làm việc; HR xem hồ sơ',
           e.id,
         );
@@ -126,7 +139,7 @@ if (/[/\\]worker\.(ts|js)$/.test(process.argv[1] || '')) {
         JSON.stringify({
           time: new Date().toISOString(),
           event: 'worker_failed',
-          code: e.code || 'ERROR',
+          code: /^[A-Z0-9_]{1,40}$/.test(String(e.code)) ? e.code : 'ERROR',
         }) + '\n',
       );
     } finally {

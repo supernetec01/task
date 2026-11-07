@@ -204,6 +204,7 @@ export function templateRoutes(api: API) {
       ready_gate_enabled: v.ready_gate_enabled,
       roles: v.roles,
       enabled: v.enabled,
+      change_reason: v.reason,
       submission_rule: previous?.definition?.submission_rule || {
         any_of: ['result_text', 'ready_asset_id', 'valid_url'],
       },

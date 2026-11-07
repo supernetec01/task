@@ -1,16 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { UserAccessWizard, GrantBatch } from './user-access';
 import { api, iso, fmt, localInput } from './api';
+import { PlatformSettings, CredentialStorage, EmployeeChecklistSettings } from './accounts';
 import { Form, useLoad, Loaded, Modal, options, roleLabel, Badge, type Field } from './ui';
 export function Team({ me }: { me: any }) {
   const [rev, setRev] = useState(0),
     { data, error } = useLoad('/users', rev),
     [selected, setSelected] = useState<any>(null),
-    [create, setCreate] = useState(false);
+    [create, setCreate] = useState(false),
+    [createdId, setCreatedId] = useState(''),
+    [editingTeam, setEditingTeam] = useState('');
   const refresh = () => setRev((r) => r + 1),
     users = data?.items || [],
     teams = data?.teams || [];
   const userOptions = users.map((u: any) => ({ value: u.id, label: u.name })),
     teamOptions = teams.map((t: any) => ({ value: t.id, label: t.name }));
+  useEffect(() => {
+    if (data) {
+      const id = createdId || selected?.id;
+      const fresh = data.items.find((u: any) => u.id === id);
+      if (fresh) {
+        setSelected(fresh);
+        setEditingTeam(fresh.team_id || '');
+        setCreatedId('');
+      }
+    }
+  }, [data]);
   return (
     <Loaded data={data} error={error}>
       <div className="heading">
@@ -56,7 +71,18 @@ export function Team({ me }: { me: any }) {
                       </div>
                     ))}
                 </td>
-                <td>{me.admin && <button onClick={() => setSelected(u)}>Quản lý</button>}</td>
+                <td>
+                  {me.admin && (
+                    <button
+                      onClick={() => {
+                        setSelected(u);
+                        setEditingTeam(u.team_id || '');
+                      }}
+                    >
+                      Quản lý
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -75,55 +101,20 @@ export function Team({ me }: { me: any }) {
         </details>
       )}
       {create && (
-        <Modal title="Tạo tài khoản" onClose={() => setCreate(false)}>
-          <Form
-            fields={[
-              { key: 'name', label: 'Họ tên', required: true },
-              { key: 'username', label: 'Tên đăng nhập', required: true },
-              { key: 'email', label: 'Email liên hệ (không bắt buộc)', type: 'email' },
-              {
-                key: 'password',
-                label: 'Mật khẩu khởi tạo (ít nhất 11 ký tự)',
-                type: 'password',
-                required: true,
-              },
-              { key: 'team_id', label: 'Nhóm', type: 'select', options: teamOptions },
-              {
-                key: 'manager_id',
-                label: 'Quản lý trực tiếp',
-                type: 'select',
-                options: userOptions,
-              },
-              {
-                key: 'reviewer_id',
-                label: 'Người duyệt mặc định',
-                type: 'select',
-                options: userOptions,
-              },
-            ]}
-            onSubmit={async (v, key) => {
-              await api(
-                '/users',
-                {
-                  ...v,
-                  email: v.email || null,
-                  team_id: v.team_id || null,
-                  manager_id: v.manager_id || null,
-                  reviewer_id: v.reviewer_id || null,
-                },
-                'POST',
-                key,
-              );
+        <Modal compact title="Tạo tài khoản" onClose={() => setCreate(false)}>
+          <UserAccessWizard
+            onCreated={(id) => {
               setCreate(false);
+              setCreatedId(id);
               refresh();
             }}
-            label="Tạo tài khoản"
           />
         </Modal>
       )}
       {selected && (
-        <Modal title={'Quyền của ' + selected.name} onClose={() => setSelected(null)}>
+        <Modal compact title={'Quyền của ' + selected.name} onClose={() => setSelected(null)}>
           <Form
+            key={selected.permission_version}
             fields={[
               { key: 'name', label: 'Họ tên', required: true },
               { key: 'active', label: 'Tài khoản đang hoạt động', type: 'checkbox' },
@@ -132,16 +123,51 @@ export function Team({ me }: { me: any }) {
                 key: 'manager_id',
                 label: 'Quản lý',
                 type: 'select',
-                options: userOptions.filter((u: any) => u.value !== selected.id),
+                options: users
+                  .filter(
+                    (u: any) =>
+                      u.active &&
+                      u.id !== selected.id &&
+                      u.grants?.some(
+                        (g: any) =>
+                          g.kind === 'ACCESS' &&
+                          !g.revoked_at &&
+                          Date.parse(g.valid_from) <= Date.now() &&
+                          (!g.valid_to || Date.parse(g.valid_to) > Date.now()) &&
+                          ((g.role === 'ADMIN' && g.scope === 'ALL') ||
+                            (['MANAGER', 'BOSS'].includes(g.role) &&
+                              (g.scope === 'ALL' ||
+                                (g.scope === 'TEAM' && g.team_id === editingTeam)))),
+                      ),
+                  )
+                  .map((u: any) => ({ value: u.id, label: u.name })),
               },
               {
                 key: 'reviewer_id',
                 label: 'Người duyệt',
                 type: 'select',
-                options: userOptions.filter((u: any) => u.value !== selected.id),
+                options: users
+                  .filter(
+                    (u: any) =>
+                      u.active &&
+                      u.id !== selected.id &&
+                      u.grants?.some(
+                        (g: any) =>
+                          g.kind === 'ACCESS' &&
+                          !g.revoked_at &&
+                          Date.parse(g.valid_from) <= Date.now() &&
+                          (!g.valid_to || Date.parse(g.valid_to) > Date.now()) &&
+                          ((g.role === 'ADMIN' && g.scope === 'ALL') ||
+                            (['MANAGER', 'BOSS'].includes(g.role) &&
+                              (g.scope === 'ALL' ||
+                                (g.scope === 'TEAM' && g.team_id === editingTeam)))),
+                      ),
+                  )
+                  .map((u: any) => ({ value: u.id, label: u.name })),
               },
             ]}
             initial={selected}
+            onChange={(v) => setEditingTeam(v.team_id || '')}
             onSubmit={async (v, key) => {
               await api(
                 '/users/' + selected.id,
@@ -162,13 +188,14 @@ export function Team({ me }: { me: any }) {
           />
           <div className="detail-section">
             <h3>Cấp vai trò có phạm vi và thời hạn</h3>
+            <GrantBatch user={selected} jobs={data.jobs} onDone={refresh} />
+            <h3>Cấp quyền truy cập bổ sung</h3>
             <GrantForm
               userId={selected.id}
               teamOptions={teamOptions}
               jobs={data.jobs}
               access={data.access}
               onDone={() => {
-                setSelected(null);
                 refresh();
               }}
             />
@@ -177,7 +204,8 @@ export function Team({ me }: { me: any }) {
             <h3>Lịch sử cấp quyền</h3>
             {selected.grants?.map((g: any) => (
               <div className="support-row" key={g.id}>
-                <strong>{roleLabel[g.role]}</strong> · {g.scope}
+                <strong>{roleLabel[g.role]}</strong> ·{' '}
+                {({ SELF: 'Cá nhân', TEAM: 'Bộ phận', ALL: 'Toàn công ty' } as any)[g.scope]}
                 <div>
                   {fmt(g.valid_from)} → {g.valid_to ? fmt(g.valid_to) : 'Không giới hạn'}
                 </div>
@@ -189,7 +217,6 @@ export function Team({ me }: { me: any }) {
                     fields={[{ key: 'reason', label: 'Lý do thu hồi', required: true }]}
                     onSubmit={async (v, key) => {
                       await api('/role-grants/' + g.id + '/revoke', v, 'POST', key);
-                      setSelected(null);
                       refresh();
                     }}
                     label="Thu hồi quyền"
@@ -203,71 +230,42 @@ export function Team({ me }: { me: any }) {
     </Loaded>
   );
 }
-function GrantForm({ userId, teamOptions, jobs, access, onDone }: any) {
-  const [kind, setKind] = useState('JOB');
+function GrantForm({ userId, teamOptions, access, onDone }: any) {
+  const [role, setRole] = useState('EMPLOYEE'),
+    [scope, setScope] = useState('SELF');
   return (
     <Form
       fields={[
-        {
-          key: 'kind',
-          label: 'Loại quyền',
-          type: 'select',
-          required: true,
-          options: [
-            { value: 'JOB', label: 'Chuyên môn' },
-            { value: 'ACCESS', label: 'Quyền truy cập' },
-          ],
-        },
-        {
-          key: 'role',
-          label: 'Vai trò',
-          type: 'select',
-          required: true,
-          options: options(kind === 'JOB' ? jobs : access, roleLabel),
-        },
-        {
-          key: 'scope',
-          label: 'Phạm vi',
-          type: 'select',
-          required: true,
-          options:
-            kind === 'JOB'
-              ? [{ value: 'SELF', label: 'Cá nhân' }]
-              : [
-                  { value: 'SELF', label: 'Cá nhân' },
-                  { value: 'TEAM', label: 'Nhóm được chọn' },
-                  { value: 'ALL', label: 'Toàn tổ chức' },
-                ],
-        },
-        {
-          key: 'team_id',
-          label: 'Nhóm áp dụng (khi phạm vi Nhóm)',
-          type: 'select',
-          options: teamOptions,
-        },
-        {
-          key: 'valid_from',
-          label: 'Có hiệu lực từ (giờ Việt Nam)',
-          type: 'datetime-local',
-          required: true,
-        },
+        ...(scope === 'TEAM'
+          ? [
+              {
+                key: 'team_id',
+                label: 'Bộ phận áp dụng',
+                type: 'select',
+                required: true,
+                options: teamOptions,
+              },
+            ]
+          : []),
+        { key: 'reason', label: 'Lý do / người chốt', type: 'textarea', required: true },
+        { key: 'valid_from', label: 'Có hiệu lực từ (bỏ trống là ngay)', type: 'datetime-local' },
         {
           key: 'valid_to',
-          label: 'Hết hiệu lực lúc (bỏ trống nếu không hạn)',
+          label: 'Hết hiệu lực lúc (bỏ trống là không hạn)',
           type: 'datetime-local',
         },
-        { key: 'reason', label: 'Lý do / người chốt', type: 'textarea', required: true },
       ]}
-      initial={{ kind: 'JOB', scope: 'SELF', valid_from: localInput(new Date()) }}
-      onChange={(v) => setKind(v.kind)}
       onSubmit={async (v, key) => {
         await api(
           '/role-grants',
           {
             ...v,
             user_id: userId,
-            team_id: v.team_id || null,
-            valid_from: iso(v.valid_from),
+            kind: 'ACCESS',
+            role,
+            scope,
+            team_id: scope === 'TEAM' ? v.team_id : null,
+            valid_from: v.valid_from ? iso(v.valid_from) : undefined,
             valid_to: iso(v.valid_to),
           },
           'POST',
@@ -275,8 +273,44 @@ function GrantForm({ userId, teamOptions, jobs, access, onDone }: any) {
         );
         onDone();
       }}
-      label="Cấp quyền"
-    />
+      label="Cấp quyền truy cập"
+    >
+      <label>
+        Vai trò truy cập
+        <select
+          value={role}
+          onChange={(e) => {
+            setRole(e.target.value);
+            setScope(
+              e.target.value === 'ADMIN' ? 'ALL' : e.target.value === 'EMPLOYEE' ? 'SELF' : 'TEAM',
+            );
+          }}
+        >
+          {access.map((r: string) => (
+            <option key={r} value={r}>
+              {roleLabel[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Phạm vi
+        <select value={scope} onChange={(e) => setScope(e.target.value)}>
+          {(role === 'ADMIN'
+            ? ['ALL']
+            : role === 'EMPLOYEE'
+              ? ['SELF']
+              : role === 'HR_SENSITIVE'
+                ? ['SELF', 'TEAM', 'ALL']
+                : ['TEAM', 'ALL']
+          ).map((r) => (
+            <option key={r} value={r}>
+              {({ SELF: 'Cá nhân', TEAM: 'Bộ phận', ALL: 'Toàn công ty' } as any)[r]}
+            </option>
+          ))}
+        </select>
+      </label>
+    </Form>
   );
 }
 export function Settings() {
@@ -293,11 +327,18 @@ export function Settings() {
     deadline_reviewer_approval: 'Q03 · Người duyệt task được quyết định gia hạn (không lùi hạn)',
     birthday_policy_confirmed:
       'Q19 · Nhắc sinh nhật trước 5 ngày làm việc, bỏ 29/02 ở năm không nhuận',
+    employee_leave_confirmed:
+      'Xác nhận nghỉ việc hiệu lực ngay: khóa user/session, thu hồi quyền, quản lý tự bàn giao',
+    recruiter_reminders_confirmed:
+      'Đã chốt tiếp tục nhắc HR kiểm tra giới thiệu khi bắt đầu thử việc',
     retention_confirmed: 'Q24 · Đã chốt lưu trữ; hệ thống không tự purge',
     reopen_enabled: 'Q14 · Cho người duyệt mở lại task đã xong',
   };
   return (
     <Loaded data={data} error={error}>
+      <PlatformSettings />
+      <CredentialStorage />
+      <EmployeeChecklistSettings />
       {policy && (
         <>
           <div className="notice">
@@ -392,16 +433,28 @@ export function Settings() {
                   label: 'Loại đề nghị',
                   type: 'select',
                   required: true,
-                  options: options([
-                    'PURCHASE',
-                    'RENTAL',
-                    'EQUIPMENT_LOAN',
-                    'SAMPLE_ISSUE',
-                    'ADVANCE',
-                    'REIMBURSEMENT',
-                    'SALES_INVOICE_REQUEST',
-                    'DOCUMENT_COLLECTION',
-                  ]),
+                  options: options(
+                    [
+                      'PURCHASE',
+                      'RENTAL',
+                      'EQUIPMENT_LOAN',
+                      'SAMPLE_ISSUE',
+                      'ADVANCE',
+                      'REIMBURSEMENT',
+                      'SALES_INVOICE_REQUEST',
+                      'DOCUMENT_COLLECTION',
+                    ],
+                    {
+                      PURCHASE: 'Mua hàng',
+                      RENTAL: 'Thuê dịch vụ',
+                      EQUIPMENT_LOAN: 'Mượn thiết bị',
+                      SAMPLE_ISSUE: 'Xuất hàng mẫu',
+                      ADVANCE: 'Tạm ứng',
+                      REIMBURSEMENT: 'Hoàn ứng / thanh toán',
+                      SALES_INVOICE_REQUEST: 'Đề nghị hóa đơn',
+                      DOCUMENT_COLLECTION: 'Thu thập chứng từ',
+                    },
+                  ),
                 },
                 { key: 'company', label: 'Pháp nhân', required: true },
                 { key: 'max_amount', label: 'Hạn mức (bỏ trống nếu chỉ duyệt nhu cầu)' },
@@ -448,7 +501,21 @@ export function Settings() {
             />
             {data.policies.map((p: any) => (
               <p key={p.id}>
-                {p.kind} · {p.company} · {p.enabled ? 'Đang bật' : 'Đang tắt'} · v{p.version}
+                {
+                  (
+                    {
+                      PURCHASE: 'Mua hàng',
+                      RENTAL: 'Thuê dịch vụ',
+                      EQUIPMENT_LOAN: 'Mượn thiết bị',
+                      SAMPLE_ISSUE: 'Xuất hàng mẫu',
+                      ADVANCE: 'Tạm ứng',
+                      REIMBURSEMENT: 'Hoàn ứng / thanh toán',
+                      SALES_INVOICE_REQUEST: 'Đề nghị hóa đơn',
+                      DOCUMENT_COLLECTION: 'Thu thập chứng từ',
+                    } as any
+                  )[p.kind]
+                }{' '}
+                · {p.company} · {p.enabled ? 'Đang bật' : 'Đang tắt'} · v{p.version}
               </p>
             ))}
           </div>
@@ -524,223 +591,4 @@ export function Settings() {
     </Loaded>
   );
 }
-export function Accounts({ me }: { me: any }) {
-  const [rev, setRev] = useState(0),
-    { data, error } = useLoad('/platform-accounts', rev),
-    [selected, setSelected] = useState<any>(),
-    [create, setCreate] = useState(false),
-    [secret, setSecret] = useState(''),
-    [history, setHistory] = useState<any[]>([]),
-    [err, setErr] = useState<any>();
-  const users = useLoad(me.admin ? '/users' : '/directory/invitees');
-  const refresh = () => setRev((r) => r + 1);
-  const reveal = async (id: string, old = false) => {
-    setErr(null);
-    try {
-      const r = await api(
-        old ? '/credential-versions/' + id + '/reveal' : '/platform-accounts/' + id + '/reveal',
-        {},
-      );
-      setSecret(r.secret);
-      setTimeout(() => setSecret(''), 30000);
-    } catch (e) {
-      setErr(e);
-    }
-  };
-  return (
-    <>
-      <div className="heading">
-        <p className="muted">
-          Tài khoản được cấp cho bạn. Mật khẩu chỉ hiện khi được yêu cầu; mọi lần xem được ghi nhật
-          ký.
-        </p>
-        {me.admin && (
-          <button className="primary" onClick={() => setCreate(true)}>
-            + Thêm tài khoản nền tảng
-          </button>
-        )}
-      </div>
-      <Loaded data={data} error={error}>
-        <div className="panel">
-          {data?.items.map((r: any) => (
-            <div className="support-row" key={r.id}>
-              <h3>
-                {r.label} <Badge>{r.platform}</Badge>
-              </h3>
-              <p>
-                {r.login} · {r.company}
-              </p>
-              <button
-                onClick={() => {
-                  setSelected(r);
-                  setSecret('');
-                  setHistory([]);
-                  setErr(null);
-                }}
-              >
-                Mở tài khoản
-              </button>
-            </div>
-          ))}
-        </div>
-      </Loaded>
-      {create && (
-        <Modal title="Thêm tài khoản nền tảng" onClose={() => setCreate(false)}>
-          <Form
-            fields={[
-              { key: 'label', label: 'Nhãn tài khoản', required: true },
-              { key: 'platform', label: 'Nền tảng', required: true },
-              { key: 'login', label: 'Tên đăng nhập', required: true },
-              { key: 'company', label: 'Pháp nhân', required: true },
-            ]}
-            onSubmit={async (v, key) => {
-              await api('/platform-accounts', v, 'POST', key);
-              setCreate(false);
-              refresh();
-            }}
-          />
-        </Modal>
-      )}
-      {selected && (
-        <Modal
-          title={selected.label}
-          onClose={() => {
-            setSelected(null);
-            setSecret('');
-            setHistory([]);
-          }}
-        >
-          <div className="actions">
-            <button onClick={() => reveal(selected.id)}>Xem mật khẩu hiện tại</button>
-            {secret && <button onClick={() => setSecret('')}>Ẩn ngay</button>}
-          </div>
-          {secret && <p className="secret">{secret}</p>}
-          {err && <div className="error">{err.message}</div>}
-          <div className="detail-section">
-            <h3>Cập nhật bản lưu</h3>
-            <div className="notice">
-              Bạn phải đổi mật khẩu trên nền tảng trước. Thao tác này chỉ cập nhật bản lưu nội bộ.
-            </div>
-            <Form
-              fields={[
-                {
-                  key: 'secret',
-                  label: 'Mật khẩu mới đã đổi trên nền tảng',
-                  type: 'password',
-                  required: true,
-                },
-                {
-                  key: 'external_changed_confirmed',
-                  label: 'Tôi xác nhận đã đổi trên nền tảng',
-                  type: 'checkbox',
-                  required: true,
-                },
-                { key: 'note', label: 'Ghi chú' },
-              ]}
-              initial={{ note: '' }}
-              onSubmit={async (v, key) => {
-                await api(
-                  '/platform-accounts/' + selected.id + '/versions',
-                  { ...v, expected_version: selected.version },
-                  'POST',
-                  key,
-                );
-                setSelected(null);
-                setSecret('');
-                refresh();
-              }}
-            />
-          </div>
-          {me.admin && (
-            <>
-              <div className="detail-section">
-                <h3>Cấp quyền sử dụng</h3>
-                <Form
-                  fields={[
-                    {
-                      key: 'user_id',
-                      label: 'Nhân viên',
-                      type: 'select',
-                      required: true,
-                      options: (users.data?.items || []).map((u: any) => ({
-                        value: u.id,
-                        label: u.name,
-                      })),
-                    },
-                    {
-                      key: 'role',
-                      label: 'Chuyên môn áp dụng',
-                      type: 'select',
-                      required: true,
-                      options: options(
-                        [
-                          'CONTENT',
-                          'DESIGNER',
-                          'MARKETPLACE',
-                          'ADS',
-                          'HR',
-                          'ACCOUNTANT',
-                          'WAREHOUSE',
-                          'INTERN',
-                        ],
-                        roleLabel,
-                      ),
-                    },
-                    { key: 'valid_to', label: 'Hết hiệu lực lúc', type: 'datetime-local' },
-                  ]}
-                  onSubmit={async (v, key) => {
-                    await api(
-                      '/platform-accounts/' + selected.id + '/grants',
-                      { ...v, valid_to: iso(v.valid_to) },
-                      'POST',
-                      key,
-                    );
-                    setSelected(null);
-                    refresh();
-                  }}
-                />
-                {selected.grants?.map((g: any) => (
-                  <div key={g.id} className="support-row">
-                    {g.user_id} · {g.role} · {g.revoked_at ? 'Đã thu hồi' : fmt(g.valid_to)}
-                    {!g.revoked_at && (
-                      <button
-                        onClick={async () => {
-                          await api('/account-grants/' + g.id + '/revoke', {});
-                          setSelected(null);
-                          refresh();
-                        }}
-                      >
-                        Thu hồi
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="detail-section">
-                <button
-                  onClick={async () => {
-                    try {
-                      setHistory(
-                        (await api('/platform-accounts/' + selected.id + '/history')).items,
-                      );
-                    } catch (e) {
-                      setErr(e);
-                    }
-                  }}
-                >
-                  Xem lịch sử phiên bản
-                </button>
-                {history.map((v: any) => (
-                  <p key={v.id}>
-                    {fmt(v.created_at)} · {v.name} · {v.note}{' '}
-                    <button onClick={() => reveal(v.id, true)}>Xem giá trị bản này</button>
-                  </p>
-                ))}
-              </div>
-            </>
-          )}
-        </Modal>
-      )}
-    </>
-  );
-}
+export { Accounts } from './accounts';

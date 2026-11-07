@@ -7,6 +7,9 @@ export function TaskDrawer({
   footer,
   onClose,
   dirty = false,
+  dialogLabel = 'Chi tiết công việc',
+  eyebrow = 'CHI TIẾT CÔNG VIỆC',
+  profile = false,
 }: {
   title: string;
   meta?: ReactNode;
@@ -14,6 +17,9 @@ export function TaskDrawer({
   footer?: ReactNode;
   onClose: () => void;
   dirty?: boolean;
+  dialogLabel?: string;
+  eyebrow?: string;
+  profile?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     forms = useRef(new Set<HTMLFormElement>()),
@@ -38,9 +44,9 @@ export function TaskDrawer({
   }, []);
   return (
     <dialog
-      className="task-drawer"
+      className={'task-drawer' + (profile ? ' profile-drawer' : '')}
       ref={ref}
-      aria-label="Chi tiết công việc"
+      aria-label={dialogLabel}
       onCancel={(e) => {
         e.preventDefault();
         close();
@@ -53,7 +59,7 @@ export function TaskDrawer({
     >
       <header className="drawer-header">
         <div className="drawer-title">
-          <div className="eyebrow">CHI TIẾT CÔNG VIỆC</div>
+          <div className="eyebrow">{eyebrow}</div>
           <h2>{title}</h2>
           {meta}
         </div>

@@ -109,7 +109,7 @@ test('Employee UI exposes no Admin, HR or sales controls; mobile menu keyboard a
     page.locator('.sidebar').getByRole('button', { name: 'Thiết lập', exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.locator('.sidebar').getByRole('button', { name: 'Nhân sự & tuyển dụng', exact: true }),
+    page.locator('.sidebar').getByRole('button', { name: 'Nhân sự', exact: true }),
   ).toHaveCount(0);
   await expect(
     page.locator('.sidebar').getByRole('button', { name: 'Kinh doanh', exact: true }),

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
+import Fastify, { LogController, type FastifyRequest, type FastifyReply } from 'fastify';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
@@ -30,9 +30,17 @@ import {
   setting,
   notify,
 } from './base.js';
-import { taskRoutes } from './tasks.js';
+import { accountAccess } from './accounts.js';
+import { hrAccess, sensitiveAllowed } from './employees.js';
+import { taskRoutes, taskAccess } from './tasks.js';
 import { reportRoutes } from './reports.js';
 import { moduleRoutes } from './modules.js';
+import {
+  createUserWithAccess,
+  addGrant,
+  validateReporting,
+  userAccessRoutes,
+} from './user-access.js';
 import { capabilities } from './capabilities.js';
 import { logStream } from './logging.js';
 export type Handler = (
@@ -50,10 +58,11 @@ export async function buildApp() {
       process.env.NODE_ENV === 'test'
         ? false
         : {
-            level: 'info',
+            level: 'error',
             stream: logStream('api'),
             redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers.set-cookie'],
           },
+    logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: 2 * 1024 * 1024,
     trustProxy: false,
   });
@@ -93,7 +102,14 @@ export async function buildApp() {
               ? 422
               : e.statusCode || 500;
     if (status >= 500)
-      req.log.error({ err: { message: e.message, code: e.code } }, 'request failed');
+      req.log.error(
+        {
+          event: 'request_failed',
+          code: /^[A-Z0-9_]{1,40}$/.test(String(e.code)) ? e.code : 'INTERNAL_ERROR',
+          request_id: req.id,
+        },
+        'request failed',
+      );
     reply.status(status).send({
       code:
         e instanceof Fault
@@ -210,8 +226,10 @@ export async function buildApp() {
               ),
             };
           }
+          const cacheable = mutation && !path.endsWith('/reveal');
           let key = '',
-            payloadHash = '';
+            payloadHash = '',
+            authorizationFingerprint = '';
           if (mutation) {
             key = String(req.headers['idempotency-key'] || '');
             need(
@@ -219,6 +237,19 @@ export async function buildApp() {
               'Thiếu Idempotency-Key',
               422,
               'IDEMPOTENCY_REQUIRED',
+            );
+          }
+          if (cacheable) {
+            authorizationFingerprint = hash(
+              JSON.stringify([
+                a.permission_version,
+                [...a.grants].sort((x, y) => x.id.localeCompare(y.id)),
+                await rows(
+                  c,
+                  'SELECT id,account_id,role,valid_to FROM account_grants WHERE user_id=$1 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now()) ORDER BY id',
+                  [a.id],
+                ),
+              ]),
             );
             payloadHash = hash(method + path + JSON.stringify(req.params) + JSON.stringify(b));
             await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [a.id + key]);
@@ -233,14 +264,36 @@ export async function buildApp() {
                 409,
                 'IDEMPOTENCY_CONFLICT',
               );
+              need(
+                old.authorization_fingerprint === authorizationFingerprint,
+                'Quyền truy cập đã thay đổi. Vui lòng tải lại dữ liệu và kiểm tra quyền trước khi lưu.',
+                403,
+                'ACCESS_CHANGED',
+              );
+              const params = req.params as any;
+              if (path.startsWith('/platform-accounts/:id')) {
+                await accountAccess(c, a, params.id);
+                if (method === 'PATCH' || method === 'PUT') need(isAdmin(a));
+              }
+              if (path.startsWith('/employees/:id')) {
+                const employee = await hrAccess(c, a, params.id);
+                if (path.endsWith('/sensitive')) need(await sensitiveAllowed(c, a, employee));
+              }
+              if (path.startsWith('/tasks/:id')) await taskAccess(c, a, params.id);
               return old.response;
             }
           }
           const result = await fn(c, a, b, req.query, req.params, reply);
-          if (mutation && !reply.sent)
+          if (cacheable && !reply.sent)
             await c.query(
-              'INSERT INTO idempotency(user_id,key,hash,response) VALUES($1,$2,$3,$4)',
-              [a.id, key, payloadHash, JSON.stringify(result ?? { ok: true })],
+              'INSERT INTO idempotency(user_id,key,hash,response,authorization_fingerprint) VALUES($1,$2,$3,$4,$5)',
+              [
+                a.id,
+                key,
+                payloadHash,
+                JSON.stringify(result ?? { ok: true }),
+                authorizationFingerprint,
+              ],
             );
           return result;
         }),
@@ -315,7 +368,7 @@ export async function buildApp() {
     need(management(a));
     const users = await rows(
       c,
-      'SELECT id,username,email,name,active,team_id,manager_id,reviewer_id,permission_version FROM users ORDER BY name',
+      'SELECT u.id,u.username,u.email,u.name,u.active,u.team_id,u.manager_id,u.reviewer_id,u.permission_version,e.employee_code FROM users u LEFT JOIN employee_profiles e ON e.user_id=u.id ORDER BY u.name',
     );
     const out = [];
     for (const u of users)
@@ -342,41 +395,8 @@ export async function buildApp() {
     await audit(c, a, 'TEAM_CREATED', 'team', t.id);
     return t;
   });
-  api('POST', '/users', async (c, a, b) => {
-    need(isAdmin(a));
-    const v = z
-      .object({
-        username: z
-          .string()
-          .trim()
-          .regex(/^[A-Za-z0-9_.-]{3,64}$/),
-        email: z.email().nullable().optional(),
-        name: z.string().trim().min(1).max(120),
-        password: z
-          .string()
-          .max(1024)
-          .refine((v) => Array.from(v).length >= 11, { message: 'Mật khẩu cần ít nhất 11 ký tự' }),
-        team_id: z.uuid().nullable(),
-        manager_id: z.uuid().nullable().optional(),
-        reviewer_id: z.uuid().nullable().optional(),
-      })
-      .parse(b);
-    const u = await one(
-      c,
-      'INSERT INTO users(username,email,name,password_hash,team_id,manager_id,reviewer_id) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [
-        v.username.toLowerCase(),
-        v.email?.toLowerCase() || null,
-        v.name,
-        await passwordHash(v.password),
-        v.team_id,
-        v.manager_id || null,
-        v.reviewer_id || null,
-      ],
-    );
-    await audit(c, a, 'USER_CREATED', 'user', u.id);
-    return u;
-  });
+  api('POST', '/users', async (c, a, b) => createUserWithAccess(c, a, b));
+  userAccessRoutes(api);
   api('PATCH', '/users/:id', async (c, a, b, q, p) => {
     need(isAdmin(a));
     const v = z
@@ -403,6 +423,7 @@ export async function buildApp() {
       422,
       'VALIDATION',
     );
+    await validateReporting(c, p.id, v.team_id, v.manager_id, v.reviewer_id);
     await c.query(
       'UPDATE users SET name=$2,active=$3,team_id=$4,manager_id=$5,reviewer_id=$6,permission_version=permission_version+1 WHERE id=$1',
       [p.id, v.name, v.active, v.team_id, v.manager_id, v.reviewer_id],
@@ -413,40 +434,7 @@ export async function buildApp() {
   });
   api('POST', '/role-grants', async (c, a, b) => {
     need(isAdmin(a));
-    const v = z
-      .object({
-        user_id: z.uuid(),
-        kind: z.enum(['JOB', 'ACCESS']),
-        role: z.string(),
-        scope: z.enum(['SELF', 'TEAM', 'ALL']),
-        team_id: z.uuid().nullable(),
-        valid_from: z.iso.datetime({ offset: true }),
-        valid_to: z.iso.datetime({ offset: true }).nullable(),
-        reason: z.string().trim().min(1).max(1000),
-      })
-      .parse(b);
-    need(
-      (v.kind === 'JOB' ? jobs : access).includes(v.role),
-      'Vai trò không hợp lệ',
-      422,
-      'VALIDATION',
-    );
-    need(
-      v.kind !== 'JOB' || v.scope === 'SELF',
-      'Role chuyên môn có phạm vi cá nhân',
-      422,
-      'VALIDATION',
-    );
-    const g = await one(
-      c,
-      'INSERT INTO grants(user_id,kind,role,scope,team_id,valid_from,valid_to,reason,granted_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *',
-      [v.user_id, v.kind, v.role, v.scope, v.team_id, v.valid_from, v.valid_to, v.reason, a.id],
-    );
-    await c.query('UPDATE users SET permission_version=permission_version+1 WHERE id=$1', [
-      v.user_id,
-    ]);
-    await audit(c, a, 'ROLE_GRANTED', 'grant', g.id, { role: v.role, user: v.user_id });
-    return g;
+    return addGrant(c, a, z.uuid().parse(b.user_id), b);
   });
   api('POST', '/role-grants/:id/revoke', async (c, a, b, q, p) => {
     need(isAdmin(a));
@@ -460,7 +448,11 @@ export async function buildApp() {
     await c.query('UPDATE users SET permission_version=permission_version+1 WHERE id=$1', [
       g.user_id,
     ]);
-    await audit(c, a, 'ROLE_REVOKED', 'grant', g.id, { reason: b.reason });
+    await c.query('INSERT INTO grant_changes(grant_id,actor_id,reason) VALUES($1,$2,$3)', [
+      g.id,
+      a.id,
+      b.reason,
+    ]);
     return { ok: true };
   });
   api('GET', '/settings', async (c, a) => {
@@ -490,13 +482,21 @@ export async function buildApp() {
             .parse(b.value)
         : z
             .object({
-              assignment_boundary_confirmed: z.boolean(),
-              report_week_confirmed: z.boolean(),
-              deadline_reviewer_approval: z.boolean(),
-              birthday_policy_confirmed: z.boolean(),
-              retention_confirmed: z.boolean(),
-              support_scope: z.enum(['TEAM', 'ALL']),
-              reopen_enabled: z.boolean(),
+              assignment_boundary_confirmed: z.boolean().default(false),
+              report_week_confirmed: z.boolean().default(false),
+              deadline_reviewer_approval: z.boolean().default(false),
+              birthday_policy_confirmed: z.boolean().default(false),
+              retention_confirmed: z.boolean().default(false),
+              support_scope: z.enum(['TEAM', 'ALL']).default('TEAM'),
+              reopen_enabled: z.boolean().default(false),
+              employee_leave_confirmed: z.boolean().default(false),
+              recruiter_reminders_confirmed: z.boolean().default(false),
+              employee_document_checklists: z
+                .partialRecord(
+                  z.enum(['FULL_TIME', 'PART_TIME', 'INTERN', 'CONTRACTOR']),
+                  z.array(z.string().trim().min(1).max(80)).max(30),
+                )
+                .optional(),
             })
             .parse(b.value);
     need(
@@ -509,7 +509,12 @@ export async function buildApp() {
       'UPDATE settings SET value=$2,version=version+1,updated_by=$3,updated_at=now() WHERE key=$1',
       [p.key, JSON.stringify(v), a.id],
     );
-    await audit(c, a, 'POLICY_DECISION', 'settings', p.key, { value: v, reason: b.reason });
+    await c.query('INSERT INTO settings_history(key,value,reason,actor_id) VALUES($1,$2,$3,$4)', [
+      p.key,
+      JSON.stringify(v),
+      b.reason,
+      a.id,
+    ]);
     return { ok: true };
   });
   api('GET', '/notifications', async (c, a) => ({
@@ -526,15 +531,13 @@ export async function buildApp() {
     ]);
     return { ok: true };
   });
-  api('GET', '/audit', async (c, a, b, q) => {
+  api('GET', '/audit', async (c, a) => {
     need(isAdmin(a));
-    return {
-      items: await rows(
-        c,
-        'SELECT a.*,u.name FROM audit a LEFT JOIN users u ON u.id=a.actor_id WHERE a.id>$1 ORDER BY a.id LIMIT 200',
-        [Number(q.after) || 0],
-      ),
-    };
+    throw new Fault(
+      410,
+      'ENDPOINT_RETIRED',
+      'Nhật ký sử dụng chung đã ngừng. Sử dụng Lịch sử mật khẩu.',
+    );
   });
   taskRoutes(api);
   reportRoutes(api);

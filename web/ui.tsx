@@ -163,6 +163,7 @@ export function Form({
   secondary,
   extraFields = [],
   extraTitle,
+  onConflict,
 }: {
   fields: Field[];
   initial?: any;
@@ -173,6 +174,7 @@ export function Form({
   secondary?: ReactNode;
   extraFields?: Field[];
   extraTitle?: string;
+  onConflict?: () => Promise<any>;
 }) {
   const [value, setValue] = useState(initial),
     [busy, setBusy] = useState(false),
@@ -187,6 +189,7 @@ export function Form({
         const form = e.currentTarget;
         if (busy) return;
         setBusy(true);
+        setSaved(false);
         setError(null);
         try {
           await onSubmit(value, key.current);
@@ -241,6 +244,26 @@ export function Form({
           {busy ? 'Đang lưu…' : label}
         </button>
         {secondary}
+        {error?.status === 409 && onConflict && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onConflict();
+                key.current = requestKey();
+                setError(null);
+              } catch (e) {
+                setError(e);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            Lấy phiên bản mới, giữ nội dung đang nhập
+          </button>
+        )}
         {saved && <span role="status">Đã lưu thành công</span>}
       </div>
     </form>
@@ -250,10 +273,12 @@ export function Modal({
   title,
   children,
   onClose,
+  compact = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  compact?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null),
     dirty = useRef(false);
@@ -272,6 +297,7 @@ export function Modal({
   }, []);
   return (
     <dialog
+      className={compact ? 'compact-dialog' : undefined}
       ref={ref}
       onCancel={(e) => {
         e.preventDefault();

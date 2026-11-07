@@ -22,6 +22,8 @@ import {
 import { recordKinds, recordSchema } from './record-config.js';
 import { recordAccess, fileRoutes } from './files.js';
 import { metricRoutes } from './metrics.js';
+import { employeeRoutes, hrAccess, sensitiveAllowed } from './employees.js';
+import { accountRoutes } from './accounts.js';
 import { taskAccess } from './tasks.js';
 const requestKinds = [
   'PURCHASE',
@@ -33,59 +35,16 @@ const requestKinds = [
   'SALES_INVOICE_REQUEST',
   'DOCUMENT_COLLECTION',
 ] as const;
-async function accountAccess(c: DB, a: Actor, id: string) {
-  const r = await one(c, 'SELECT * FROM platform_accounts WHERE id=$1', [id]);
-  need(r, 'Không tìm thấy tài khoản', 404, 'NOT_FOUND');
-  if (!isAdmin(a)) {
-    const grants = await rows(
-      c,
-      'SELECT * FROM account_grants WHERE account_id=$1 AND user_id=$2 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now())',
-      [id, a.id],
-    );
-    need(
-      grants.some((g) => hasJob(a, g.role)),
-      'Không tìm thấy tài khoản',
-      404,
-      'NOT_FOUND',
-    );
-  }
-  return r;
-}
-async function hrAccess(c: DB, a: Actor, id: string, lock = false) {
-  need(isAdmin(a) || hasJob(a, 'HR'));
-  const e = await one(
-    c,
-    'SELECT * FROM employee_profiles WHERE id=$1' + (lock ? ' FOR UPDATE' : ''),
-    [id],
-  );
-  need(e, 'Không tìm thấy nhân viên', 404, 'NOT_FOUND');
-  if (!isAdmin(a) && e.created_by !== a.id) {
-    const owner = await one(c, 'SELECT id,team_id FROM users WHERE id=$1', [e.created_by]);
-    need(manages(a, owner));
-  }
-  return e;
-}
-async function sensitiveAllowed(c: DB, a: Actor, e: any) {
-  if (isAdmin(a)) return true;
-  const user = e.user_id
-    ? await one(c, 'SELECT team_id FROM users WHERE id=$1', [e.user_id])
-    : null;
-  return a.grants.some(
-    (g) =>
-      g.kind === 'ACCESS' &&
-      g.role === 'HR_SENSITIVE' &&
-      (g.scope === 'ALL' ||
-        (g.scope === 'SELF' && e.user_id === a.id) ||
-        (g.scope === 'TEAM' && user?.team_id === g.team_id)),
-  );
-}
 export function moduleRoutes(api: API) {
   fileRoutes(api);
+  accountRoutes(api);
+  employeeRoutes(api);
   metricRoutes(api);
   api('GET', '/modules', async (c, a) => ({
     kinds: Object.fromEntries(
       Object.entries(recordKinds).filter(
-        ([, v]) => moduleAllowed(a, v.module) && (isAdmin(a) || hasJob(a, v.role)),
+        ([, v]) =>
+          v.module !== 'hr' && moduleAllowed(a, v.module) && (isAdmin(a) || hasJob(a, v.role)),
       ),
     ),
     requestKinds,
@@ -138,6 +97,12 @@ export function moduleRoutes(api: API) {
       })
       .parse(b);
     const conf = recordKinds[v.kind];
+    need(
+      conf?.module !== 'hr',
+      'Luồng tuyển dụng cũ chỉ còn dữ liệu lưu trữ',
+      410,
+      'LEGACY_READ_ONLY',
+    );
     need(conf, 'Loại hồ sơ chưa được định nghĩa', 422, 'VALIDATION');
     need(isAdmin(a) || hasJob(a, conf.role));
     const payload = recordSchema(v.kind)!.parse(v.payload);
@@ -244,74 +209,6 @@ export function moduleRoutes(api: API) {
   }
   api('POST', '/records', async (c, a, b) => saveRecord(c, a, b));
   api('PATCH', '/records/:id', async (c, a, b, q, p) => saveRecord(c, a, b, p.id));
-  api('GET', '/employees', async (c, a) => {
-    need(isAdmin(a) || hasJob(a, 'HR'));
-    const data = await rows(
-      c,
-      'SELECT e.id,e.created_by,e.user_id,e.name,e.birthday,e.employment_state,e.probation_start,e.official_start,e.contract_date,e.candidate_id,e.recruiter_id,e.version,u.team_id FROM employee_profiles e JOIN users u ON u.id=e.created_by ORDER BY e.name',
-    );
-    return {
-      items: data.filter(
-        (e) =>
-          isAdmin(a) ||
-          e.created_by === a.id ||
-          manages(a, { id: e.created_by, team_id: e.team_id }),
-      ),
-    };
-  });
-  api('POST', '/employees', async (c, a, b) => {
-    need(isAdmin(a) || hasJob(a, 'HR'));
-    const v = z
-      .object({
-        user_id: z.uuid().nullable().default(null),
-        candidate_id: z.uuid().nullable().default(null),
-        name: z.string().min(1).max(150),
-        birthday: z.iso.date().nullable().default(null),
-        recruiter_id: z.uuid().nullable().default(null),
-        contract_date: z.iso.date().nullable().default(null),
-      })
-      .parse(b);
-    if (v.candidate_id) {
-      const candidate = await recordAccess(c, a, v.candidate_id);
-      need(candidate.kind === 'CANDIDATE', 'Không phải hồ sơ ứng viên', 422, 'VALIDATION');
-    }
-    const e = await one(
-      c,
-      'INSERT INTO employee_profiles(created_by,user_id,candidate_id,name,birthday,recruiter_id,contract_date) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
-      [a.id, v.user_id, v.candidate_id, v.name, v.birthday, v.recruiter_id, v.contract_date],
-    );
-    await audit(c, a, 'EMPLOYEE_CREATED', 'employee', e.id);
-    return e;
-  });
-  api('GET', '/employees/:id', async (c, a, b, q, p) => {
-    const e = await hrAccess(c, a, p.id);
-    delete e.sensitive_cipher;
-    return {
-      ...e,
-      events: await rows(
-        c,
-        'SELECT * FROM employment_events WHERE employee_id=$1 ORDER BY created_at',
-        [e.id],
-      ),
-    };
-  });
-  api('PATCH', '/employees/:id', async (c, a, b, q, p) => {
-    const e = await hrAccess(c, a, p.id, true);
-    version(e, b.expected_version);
-    const v = z
-      .object({
-        name: z.string().min(1).max(150),
-        birthday: z.iso.date().nullable(),
-        contract_date: z.iso.date().nullable(),
-      })
-      .parse(b);
-    await c.query(
-      'UPDATE employee_profiles SET name=$2,birthday=$3,contract_date=$4,version=version+1 WHERE id=$1',
-      [e.id, v.name, v.birthday, v.contract_date],
-    );
-    await audit(c, a, 'EMPLOYEE_UPDATED', 'employee', e.id);
-    return { ok: true };
-  });
   api('POST', '/employees/:id/probation-start', async (c, a, b, q, p) => {
     const e = await hrAccess(c, a, p.id, true);
     version(e, b.expected_version);
@@ -329,15 +226,16 @@ export function moduleRoutes(api: API) {
       c,
       "SELECT DISTINCT user_id FROM grants WHERE kind='JOB' AND role='HR' AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now())",
     );
-    for (const u of hr)
-      if (u.user_id === e.created_by || isAdmin(await actor(c, u.user_id)))
-        await notify(
-          c,
-          u.user_id,
-          'probation:' + e.id,
-          'Có sự kiện bắt đầu thử việc; HR kiểm tra thưởng tuyển dụng, không tự tính tiền',
-          e.id,
-        );
+    if ((await setting(c, 'policies')).recruiter_reminders_confirmed)
+      for (const u of hr)
+        if (u.user_id === e.created_by || isAdmin(await actor(c, u.user_id)))
+          await notify(
+            c,
+            u.user_id,
+            'probation:' + e.id,
+            'Có sự kiện bắt đầu thử việc; HR kiểm tra thưởng tuyển dụng, không tự tính tiền',
+            e.id,
+          );
     await audit(c, a, 'PROBATION_STARTED', 'employee', e.id);
     return { ok: true };
   });
@@ -352,12 +250,12 @@ export function moduleRoutes(api: API) {
       })
       .parse(b);
     need(
-      e.employment_state === 'PROBATION' ||
-        (v.state === 'LEFT' && e.employment_state === 'OFFICIAL'),
-      'Chuyển trạng thái không hợp lệ',
-      409,
-      'STATE',
+      v.state !== 'LEFT',
+      'Luồng nghỉ việc đã chuyển sang /employees/:id/leave để kiểm tra chính sách bàn giao',
+      410,
+      'ENDPOINT_RETIRED',
     );
+    need(e.employment_state === 'PROBATION', 'Chuyển trạng thái không hợp lệ', 409, 'STATE');
     await c.query(
       "UPDATE employee_profiles SET employment_state=$2,official_start=CASE WHEN $2='OFFICIAL' THEN $3 ELSE official_start END,version=version+1 WHERE id=$1",
       [e.id, v.state, v.date],
@@ -366,13 +264,6 @@ export function moduleRoutes(api: API) {
       'INSERT INTO employment_events(employee_id,kind,business_date,actor_id,payload) VALUES($1,$2,$3,$4,$5)',
       [e.id, v.state, v.date, a.id, JSON.stringify({ reason: v.reason })],
     );
-    if (v.state === 'LEFT' && e.user_id) {
-      await c.query(
-        'UPDATE users SET active=false,permission_version=permission_version+1 WHERE id=$1',
-        [e.user_id],
-      );
-      await c.query('DELETE FROM sessions WHERE user_id=$1', [e.user_id]);
-    }
     await audit(c, a, 'EMPLOYMENT_CHANGED', 'employee', e.id, { state: v.state });
     return { ok: true };
   });
@@ -390,6 +281,10 @@ export function moduleRoutes(api: API) {
       .object({
         salary: z.string().max(100),
         identity_document: z.string().max(100),
+        tax_id: z.string().max(100).default(''),
+        social_insurance: z.string().max(100).default(''),
+        bank_name: z.string().max(150).default(''),
+        bank_account: z.string().max(150).default(''),
         notes: z.string().max(5000),
       })
       .parse(b.data);
@@ -399,120 +294,6 @@ export function moduleRoutes(api: API) {
     );
     await audit(c, a, 'HR_SENSITIVE_UPDATED', 'employee', e.id);
     return { ok: true };
-  });
-  api('GET', '/platform-accounts', async (c, a) => {
-    const data = await rows(c, 'SELECT * FROM platform_accounts ORDER BY label'),
-      items = [];
-    for (const r of data)
-      if (
-        await accountAccess(c, a, r.id)
-          .then(() => true)
-          .catch(() => false)
-      )
-        items.push({
-          ...r,
-          grants: isAdmin(a)
-            ? await rows(c, 'SELECT * FROM account_grants WHERE account_id=$1', [r.id])
-            : undefined,
-        });
-    return { items };
-  });
-  api('POST', '/platform-accounts', async (c, a, b) => {
-    need(isAdmin(a));
-    const v = z
-      .object({
-        label: z.string().min(1).max(150),
-        platform: z.string().min(1).max(80),
-        login: z.string().min(1).max(255),
-        company: z.string().min(1).max(150),
-      })
-      .parse(b);
-    const r = await one(
-      c,
-      'INSERT INTO platform_accounts(label,platform,login,company) VALUES($1,$2,$3,$4) RETURNING *',
-      [v.label, v.platform, v.login, v.company],
-    );
-    await audit(c, a, 'ACCOUNT_CREATED', 'account', r.id);
-    return r;
-  });
-  api('POST', '/platform-accounts/:id/grants', async (c, a, b, q, p) => {
-    need(isAdmin(a));
-    await accountAccess(c, a, p.id);
-    const v = z
-      .object({
-        user_id: z.uuid(),
-        role: z.string(),
-        valid_to: z.iso.datetime({ offset: true }).nullable(),
-      })
-      .parse(b);
-    need(
-      hasJob(await actor(c, v.user_id), v.role),
-      'Người nhận cần role đang hiệu lực',
-      422,
-      'VALIDATION',
-    );
-    const g = await one(
-      c,
-      'INSERT INTO account_grants(account_id,user_id,role,valid_to) VALUES($1,$2,$3,$4) ON CONFLICT(account_id,user_id,role) DO UPDATE SET valid_to=EXCLUDED.valid_to,revoked_at=NULL RETURNING *',
-      [p.id, v.user_id, v.role, v.valid_to],
-    );
-    await audit(c, a, 'ACCOUNT_GRANTED', 'account', p.id, { user_id: v.user_id });
-    return g;
-  });
-  api('POST', '/account-grants/:id/revoke', async (c, a, b, q, p) => {
-    need(isAdmin(a));
-    await c.query('UPDATE account_grants SET revoked_at=now() WHERE id=$1', [p.id]);
-    await audit(c, a, 'ACCOUNT_REVOKED', 'account_grant', p.id);
-    return { ok: true };
-  });
-  api('POST', '/platform-accounts/:id/versions', async (c, a, b, q, p) => {
-    const r = await accountAccess(c, a, p.id);
-    await c.query('SELECT id FROM platform_accounts WHERE id=$1 FOR UPDATE', [r.id]);
-    version(r, b.expected_version);
-    const v = z
-      .object({
-        secret: z.string().min(1).max(10000),
-        external_changed_confirmed: z.literal(true),
-        note: z.string().max(1000).default(''),
-      })
-      .parse(b);
-    const cv = await one(
-      c,
-      'INSERT INTO credential_versions(account_id,ciphertext,actor_id,note) VALUES($1,$2,$3,$4) RETURNING id,created_at',
-      [r.id, cipher(v.secret), a.id, v.note],
-    );
-    await c.query('UPDATE platform_accounts SET version=version+1 WHERE id=$1', [r.id]);
-    await audit(c, a, 'CREDENTIAL_UPDATED', 'credential', cv.id);
-    return cv;
-  });
-  api('POST', '/platform-accounts/:id/reveal', async (c, a, b, q, p) => {
-    await accountAccess(c, a, p.id);
-    const cv = await one(
-      c,
-      'SELECT * FROM credential_versions WHERE account_id=$1 ORDER BY created_at DESC LIMIT 1',
-      [p.id],
-    );
-    need(cv, 'Chưa lưu mật khẩu', 404, 'NOT_FOUND');
-    await audit(c, a, 'CREDENTIAL_REVEALED', 'credential', cv.id);
-    return { secret: decipher(cv.ciphertext) };
-  });
-  api('GET', '/platform-accounts/:id/history', async (c, a, b, q, p) => {
-    need(isAdmin(a));
-    await accountAccess(c, a, p.id);
-    return {
-      items: await rows(
-        c,
-        'SELECT v.id,v.actor_id,v.note,v.created_at,u.name FROM credential_versions v JOIN users u ON u.id=v.actor_id WHERE account_id=$1 ORDER BY created_at DESC',
-        [p.id],
-      ),
-    };
-  });
-  api('POST', '/credential-versions/:id/reveal', async (c, a, b, q, p) => {
-    need(isAdmin(a));
-    const cv = await one(c, 'SELECT * FROM credential_versions WHERE id=$1', [p.id]);
-    need(cv, 'Không tìm thấy', 404, 'NOT_FOUND');
-    await audit(c, a, 'CREDENTIAL_HISTORY_REVEALED', 'credential', cv.id);
-    return { secret: decipher(cv.ciphertext) };
   });
   api('POST', '/approval-policies', async (c, a, b) => {
     need(isAdmin(a));

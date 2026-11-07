@@ -3,7 +3,7 @@
 }
 body {
   margin: 0;
-  background: #f5f6f1;
+  background: #f5f7f2;
   color: #293e34;
   font:
     14px/1.55 system-ui,
@@ -66,7 +66,7 @@ p {
   margin-top: 0;
 }
 h1 {
-  font-size: 29px;
+  font-size: 30px;
   color: #183c30;
   letter-spacing: -0.6px;
 }
@@ -83,7 +83,7 @@ small,
 .sidebar {
   position: fixed;
   inset: 0 auto 0 0;
-  width: 244px;
+  width: 228px;
   background: white;
   border-right: 1px solid #e5e9e2;
   padding: 24px 16px;
@@ -152,7 +152,7 @@ small,
   padding-top: 16px;
 }
 .main {
-  margin-left: 244px;
+  margin-left: 228px;
 }
 .topbar {
   height: 72px;
@@ -882,4 +882,107 @@ details[open] > summary {
   border-radius: 10px;
   padding: 14px;
   margin: 14px 0;
+}
+/* Account, personnel and access upgrade: desktop tables scroll within their panel. */
+.profile-drawer {
+  width: min(620px, 100vw) !important;
+}
+.platform-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #e7f1e5;
+  color: #176348;
+  font-weight: 700;
+  margin-right: 10px;
+}
+.viewer-options {
+  max-height: 310px;
+  overflow: auto;
+  margin-top: 12px;
+}
+.viewer-option {
+  padding: 10px 0;
+  border-bottom: 1px solid #dce5dc;
+}
+.viewer-option small {
+  display: block;
+  color: #6d7e73;
+  margin-top: 4px;
+}
+.viewer-role-options {
+  display: grid;
+  gap: 6px;
+  padding-left: 26px;
+}
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+.stack-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: flex-start;
+}
+.secret-value {
+  font-family: ui-monospace, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 6px 0 10px;
+  max-width: 280px;
+}
+.secret-control .actions {
+  flex-wrap: wrap;
+}
+.profile-drawer .task-facts {
+  margin: 20px 0;
+}
+@media (max-width: 640px) {
+  .check-grid {
+    grid-template-columns: 1fr;
+  }
+  .toolbar {
+    align-items: stretch;
+  }
+  .toolbar > input,
+  .toolbar > select,
+  .toolbar > label {
+    width: 100%;
+    min-width: 0;
+  }
+  .profile-drawer {
+    width: 100vw !important;
+  }
+}
+
+small.row-meta {
+  display: block;
+  margin-top: 4px;
+}
+
+dialog.compact-dialog {
+  width: min(640px, 94vw);
+}
+
+.compact-dialog .form-footer {
+  position: sticky;
+  bottom: -24px;
+  background: white;
+  padding: 14px 0;
+  border-top: 1px solid #dce5dc;
+  z-index: 1;
+  flex-wrap: wrap;
+}
+
+.employee-photo {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  object-fit: cover;
+  margin: 12px 0;
 }

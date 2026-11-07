@@ -18,6 +18,8 @@ import { Reports, Plans, Summary } from './reports';
 import { Team, Settings, Accounts } from './admin';
 import { Records, Requests } from './modules';
 import { TemplateAdmin } from './template-admin';
+import { EmployeeDirectory } from './employees';
+import { PasswordHistory } from './accounts';
 import { Metrics, Claims } from './business';
 import './style.css';
 const names: Record<string, string> = {
@@ -29,7 +31,7 @@ const names: Record<string, string> = {
   content: 'Nội dung & sản xuất',
   business: 'Kinh doanh',
   ads: 'Quảng cáo',
-  hr: 'Nhân sự & tuyển dụng',
+  hr: 'Nhân sự',
   warehouse: 'Kho & mẫu hàng',
   finance: 'Mua hàng & chứng từ',
   requests: 'Đề nghị & phê duyệt',
@@ -39,7 +41,7 @@ const names: Record<string, string> = {
   templates: 'Mẫu công việc',
   notifications: 'Thông báo',
   profile: 'Tài khoản của tôi',
-  audit: 'Nhật ký thay đổi',
+  history: 'Lịch sử mật khẩu',
   issues: 'Kiểm thử',
 };
 function App() {
@@ -272,6 +274,8 @@ function App() {
                 <Metrics kind="VIDEO" />
               ) : sub === 'Hiệu quả livestream' ? (
                 <Metrics kind="LIVE" />
+              ) : current === 'hr' ? (
+                <EmployeeDirectory me={me} />
               ) : (
                 <Records key={current} module={current} me={me} />
               )}
@@ -280,7 +284,8 @@ function App() {
           {current === 'requests' && <Requests me={me} />} {current === 'users' && <Team me={me} />}{' '}
           {current === 'templates' && <TemplateAdmin />}
           {current === 'settings' && <Settings />} {current === 'accounts' && <Accounts me={me} />}{' '}
-          {current === 'notifications' && <Notifications />} {current === 'audit' && <Audit />}{' '}
+          {current === 'notifications' && <Notifications />}{' '}
+          {current === 'history' && <PasswordHistory />}{' '}
           {current === 'profile' && (
             <div className="panel">
               <h2>Đổi mật khẩu đăng nhập</h2>
@@ -529,38 +534,6 @@ function Notifications() {
         ) : (
           <Empty>Chưa có thông báo.</Empty>
         )}
-      </div>
-    </Loaded>
-  );
-}
-function Audit() {
-  const { data, error } = useLoad('/audit');
-  return (
-    <Loaded data={data} error={error}>
-      <div className="panel tablewrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Người thực hiện</th>
-              <th>Hành động</th>
-              <th>Đối tượng</th>
-              <th>Thời gian</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.items.map((a: any) => (
-              <tr key={a.id}>
-                <td>{a.name || 'Hệ thống'}</td>
-                <td>{a.action}</td>
-                <td>
-                  {a.object_type}
-                  <div className="code">{a.object_id}</div>
-                </td>
-                <td>{a.created_at}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </Loaded>
   );
