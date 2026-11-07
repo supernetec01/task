@@ -1,13 +1,15 @@
+import { canViewAccount } from './account-sharing.js';
 import { type DB, type Actor, rows, isAdmin, management, hasJob, moduleAllowed } from './base.js';
 export async function capabilities(c: DB, a: Actor) {
   const admin = isAdmin(a),
     manager = management(a),
     worker = a.grants.some((g) => g.kind === 'JOB');
-  const accountGrants = await rows(
-    c,
-    'SELECT role FROM account_grants WHERE user_id=$1 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now())',
-    [a.id],
-  );
+  let sharedAccount = false;
+  for (const r of await rows(c, 'SELECT id FROM platform_accounts'))
+    if (await canViewAccount(c, a.id, r.id)) {
+      sharedAccount = true;
+      break;
+    }
   const groups = [
     {
       id: 'work',
@@ -31,7 +33,7 @@ export async function capabilities(c: DB, a: Actor) {
       label: 'Đề nghị & tài khoản',
       items: [
         ...(a.grants.length ? ['requests'] : []),
-        ...(admin || accountGrants.some((g) => hasJob(a, g.role)) ? ['accounts'] : []),
+        ...(admin || sharedAccount ? ['accounts'] : []),
       ],
     },
     {

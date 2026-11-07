@@ -152,13 +152,13 @@ test('Offline save preserves task draft, retries the same key, closing asks befo
     dialog.getByRole('heading', { name: /Kịch bản có thông tin chuyên môn/ }),
   ).toBeVisible();
   await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
-  await dialog.locator('summary').filter({ hasText: 'Thông tin chuyên môn' }).click();
+  await expect(dialog.getByLabel('Mục tiêu', { exact: true })).toBeVisible();
   await dialog.getByLabel('Mục tiêu', { exact: true }).fill('Mục tiêu được lưu');
   await dialog.getByLabel('Câu mở đầu', { exact: true }).fill('Câu mở đầu được lưu');
   await dialog.getByLabel('Nội dung cập nhật / kết quả').fill('Tiến độ cùng payload');
   await dialog.getByRole('button', { name: 'Lưu cập nhật', exact: true }).click();
   await expect(dialog.getByText('Đã lưu cập nhật công việc.', { exact: true })).toBeVisible();
-  await dialog.locator('summary').filter({ hasText: 'Thông tin chuyên môn' }).click();
+  await expect(dialog.getByLabel('Mục tiêu', { exact: true })).toBeVisible();
   await expect(dialog.getByLabel('Mục tiêu', { exact: true })).toHaveValue('Mục tiêu được lưu');
   await expect(dialog.getByLabel('Câu mở đầu', { exact: true })).toHaveValue('Câu mở đầu được lưu');
 });

@@ -9,6 +9,8 @@ export type Field = {
   options?: { value: string; label: string }[];
   fields?: Field[];
   hint?: string;
+  readonly?: boolean;
+  section?: string;
 };
 export function ErrorBox({ error }: { error: any }) {
   return error ? (
@@ -16,7 +18,22 @@ export function ErrorBox({ error }: { error: any }) {
       {error.message || String(error)}
       {error.fields?.map((f: any, i: number) => (
         <div key={i}>
-          {f.path?.join(' › ')}: {f.message}
+          {f.path
+            ?.map(
+              (p: string) =>
+                (
+                  ({
+                    username: 'Tên đăng nhập',
+                    employee_code: 'Mã nhân sự',
+                    name: 'Họ tên',
+                    password: 'Mật khẩu',
+                    email: 'Email',
+                    team_id: 'Bộ phận',
+                  }) as Record<string, string>
+                )[p] || p,
+            )
+            .join(' › ')}
+          : {f.message}
         </div>
       ))}
     </div>
@@ -56,7 +73,7 @@ export const statusLabel: Record<string, string> = {
   FULFILLED: 'Đã ghi nhận xử lý bên ngoài',
 };
 export const roleLabel: Record<string, string> = {
-  CONTENT: 'Content',
+  CONTENT: 'Nội dung',
   DESIGNER: 'Thiết kế',
   MARKETPLACE: 'Vận hành sàn',
   ADS: 'Quảng cáo',
@@ -68,7 +85,8 @@ export const roleLabel: Record<string, string> = {
   MANAGER: 'Quản lý',
   BOSS: 'Sếp',
   EMPLOYEE: 'Nhân viên',
-  HR_SENSITIVE: 'Hồ sơ nhạy cảm HR',
+  HR_SENSITIVE: 'Quyền cũ · không mở hồ sơ nhạy cảm',
+  EXECUTIVE: 'Ban lãnh đạo · hồ sơ nhạy cảm',
   COMMON: 'Bổ sung chung',
   TESTER_OPTIONAL: 'Kiểm thử',
 };
@@ -76,12 +94,39 @@ export function FieldControl({
   field: f,
   value,
   onChange,
+  error,
 }: {
   field: Field;
   value: any;
+  error?: string;
   onChange: (v: any) => void;
 }) {
   const id = React.useId();
+  if (f.type === 'multi-select')
+    return (
+      <fieldset>
+        <legend>{f.label}</legend>
+        <div className="check-grid">
+          {f.options?.map((o) => (
+            <label className="check" key={o.value}>
+              <input
+                type="checkbox"
+                checked={(value || []).includes(o.value)}
+                onChange={(e) =>
+                  onChange(
+                    e.target.checked
+                      ? [...(value || []), o.value]
+                      : (value || []).filter((v: string) => v !== o.value),
+                  )
+                }
+              />
+              {o.label}
+            </label>
+          ))}
+        </div>
+        {f.hint && <small>{f.hint}</small>}
+      </fieldset>
+    );
   if (f.type === 'array')
     return (
       <fieldset>
@@ -116,7 +161,10 @@ export function FieldControl({
     id,
     name: f.key,
     'aria-label': f.label,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': error ? id + '-error' : undefined,
     required: f.required,
+    disabled: f.readonly,
     value: value ?? '',
     onChange: (e: any) =>
       onChange(
@@ -150,6 +198,11 @@ export function FieldControl({
         <input {...props} type={f.type || 'text'} step={f.type === 'number' ? 'any' : undefined} />
       )}{' '}
       {f.hint && <small>{f.hint}</small>}
+      {error && (
+        <small className="field-error" id={id + '-error'}>
+          {error}
+        </small>
+      )}
     </label>
   );
 }
@@ -163,6 +216,8 @@ export function Form({
   secondary,
   extraFields = [],
   extraTitle,
+  specializedInline = false,
+  childrenBeforeExtra = false,
   onConflict,
 }: {
   fields: Field[];
@@ -174,12 +229,33 @@ export function Form({
   secondary?: ReactNode;
   extraFields?: Field[];
   extraTitle?: string;
+  specializedInline?: boolean;
+  childrenBeforeExtra?: boolean;
   onConflict?: () => Promise<any>;
 }) {
   const [value, setValue] = useState(initial),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<any>(),
     [saved, setSaved] = useState(false);
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!error) return;
+    const summary = errorRef.current;
+    summary?.scrollIntoView({ block: 'nearest' });
+    summary?.focus();
+    const field =
+      error.fields?.[0]?.path?.[0] ||
+      (error.code === 'EMPLOYEE_CODE_EXISTS' ? 'employee_code' : null);
+    if (field) {
+      const control = Array.from(
+        summary?.closest('form')?.querySelectorAll<HTMLInputElement>('input,select,textarea') || [],
+      ).find((x) => x.name === field);
+      control?.setAttribute('aria-invalid', 'true');
+      control?.setAttribute('aria-describedby', summary?.id || '');
+      control?.focus();
+    }
+  }, [error]);
+  const summaryId = React.useId();
   const key = useRef('');
   if (!key.current) key.current = requestKey();
   return (
@@ -202,14 +278,26 @@ export function Form({
           setBusy(false);
         }
       }}
-      onChange={() => setSaved(false)}
+      onChange={(e) => {
+        setSaved(false);
+        (e.target as HTMLElement).removeAttribute('aria-invalid');
+      }}
     >
+      <div ref={errorRef} id={summaryId} tabIndex={-1} className="form-error-summary">
+        <ErrorBox error={error} />
+      </div>
       <div className="form-fields">
         {fields.map((f) => (
           <FieldControl
             key={f.key}
             field={f}
             value={value[f.key]}
+            error={
+              error?.fields?.find((e: any) => e.path?.[0] === f.key)?.message ||
+              (error?.code === 'EMPLOYEE_CODE_EXISTS' && f.key === 'employee_code'
+                ? error.message
+                : undefined)
+            }
             onChange={(v) => {
               const next = { ...value, [f.key]: v };
               setValue(next);
@@ -218,29 +306,38 @@ export function Form({
           />
         ))}
       </div>
+      {childrenBeforeExtra && children}
       {extraFields.length > 0 && (
-        <details className="specialized-fields">
+        <details className="specialized-fields" open={specializedInline || undefined}>
           <summary>{extraTitle || 'Thông tin chuyên môn'}</summary>
           <div className="form-fields">
-            {extraFields.map((f) => (
-              <FieldControl
-                key={f.key}
-                field={f}
-                value={value[f.key]}
-                onChange={(v) => {
-                  const next = { ...value, [f.key]: v };
-                  setValue(next);
-                  onChange?.(next);
-                }}
-              />
+            {extraFields.map((f, i) => (
+              <React.Fragment key={f.key}>
+                {f.section && (i === 0 || extraFields[i - 1].section !== f.section) && (
+                  <h4 className="form-section-title">{f.section}</h4>
+                )}
+                <FieldControl
+                  key={f.key}
+                  field={f}
+                  value={value[f.key]}
+                  error={error?.fields?.find((e: any) => e.path?.[0] === f.key)?.message}
+                  onChange={(v) => {
+                    const next = { ...value, [f.key]: v };
+                    setValue(next);
+                    onChange?.(next);
+                  }}
+                />
+              </React.Fragment>
             ))}
           </div>
         </details>
       )}
-      {children}
-      <ErrorBox error={error} />
+      {!childrenBeforeExtra && children}
       <div className="form-footer">
-        <button disabled={busy} className="primary">
+        <button
+          disabled={busy || (fields.length > 0 && fields.every((f) => f.readonly))}
+          className="primary"
+        >
           {busy ? 'Đang lưu…' : label}
         </button>
         {secondary}
@@ -349,4 +446,69 @@ export function Loaded({ data, error, children }: { data: any; error: any; child
   );
 }
 export const options = (values: string[], labels: Record<string, string> = {}) =>
-  values.map((v) => ({ value: v, label: labels[v] || v }));
+  values.map((v) => ({ value: v, label: labels[v] || businessLabels[v] || v }));
+
+export function useHourlyRefresh(refresh: () => void) {
+  const latest = useRef(refresh);
+  latest.current = refresh;
+  useEffect(() => {
+    const timer = setInterval(() => latest.current(), 60 * 60 * 1000);
+    return () => clearInterval(timer);
+  }, []);
+}
+
+export const businessLabels: Record<string, string> = {
+  PURCHASE: 'Mua hàng',
+  RENTAL: 'Thuê dịch vụ / thiết bị',
+  EQUIPMENT_LOAN: 'Mượn thiết bị',
+  SAMPLE_ISSUE: 'Đề nghị xuất mẫu',
+  ADVANCE: 'Tạm ứng',
+  REIMBURSEMENT: 'Hoàn chi',
+  SALES_INVOICE_REQUEST: 'Yêu cầu xuất hóa đơn',
+  DOCUMENT_COLLECTION: 'Thu chứng từ',
+  UNSPECIFIED: 'Chưa xác định',
+  CLAIMED: 'Đã yêu cầu',
+  APPROVED: 'Đã duyệt',
+  RECEIVED: 'Đã nhận',
+  PERIOD: 'Theo kỳ',
+  SNAPSHOT: 'Tại thời điểm',
+  PERIOD_UNIQUE: 'Duy nhất trong kỳ',
+  RATIO: 'Tỷ lệ',
+  CUMULATIVE: 'Lũy kế',
+  SALES: 'Bán hàng',
+  ADS: 'Quảng cáo',
+  VIDEO: 'Video',
+  LIVE: 'Livestream',
+  gmv: 'Tổng giá trị hàng hóa (GMV)',
+  total_revenue: 'Doanh thu',
+  orders: 'Số đơn',
+  items_sold: 'Số sản phẩm bán',
+  refunds_amount: 'Giá trị hoàn',
+  sku_orders: 'Đơn theo SKU',
+  page_views: 'Lượt xem trang',
+  visitors: 'Khách truy cập duy nhất',
+  customers: 'Khách mua duy nhất',
+  product_impressions: 'Lượt hiển thị sản phẩm',
+  unique_product_impressions: 'Người xem sản phẩm duy nhất',
+  product_clicks: 'Lượt nhấp sản phẩm',
+  conversion_rate: 'Tỷ lệ chuyển đổi',
+  ad_spend: 'Chi phí quảng cáo',
+  impressions: 'Lượt hiển thị',
+  unique_impressions: 'Người xem duy nhất',
+  clicks: 'Lượt nhấp',
+  conversions: 'Chuyển đổi',
+  attributed_gmv: 'GMV quy thuộc',
+  views: 'Lượt xem',
+  likes: 'Lượt thích',
+  comments: 'Bình luận',
+  shares: 'Lượt chia sẻ',
+  DAY: 'Theo ngày',
+  WEEK: 'Theo tuần',
+  MONTH: 'Theo tháng',
+  ROW: 'Theo dòng dữ liệu',
+  ORDER: 'Theo đơn hàng',
+  SUM: 'Cộng tổng',
+  LATEST: 'Giá trị mới nhất',
+  UNIQUE: 'Số lượng duy nhất',
+  AVERAGE: 'Trung bình',
+};

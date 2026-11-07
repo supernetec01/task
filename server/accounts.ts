@@ -1,3 +1,4 @@
+import { canViewAccount, effectiveViewers, viewerIds, sharingHistory } from './account-sharing.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { API } from './app.js';
@@ -60,17 +61,7 @@ export async function accountAccess(c: DB, a: Actor, id: string, lock = false) {
   );
   need(r, 'Không tìm thấy tài khoản', 404, 'NOT_FOUND');
   if (!isAdmin(a)) {
-    const g = await rows(
-      c,
-      'SELECT role FROM account_grants WHERE account_id=$1 AND user_id=$2 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now())',
-      [id, a.id],
-    );
-    need(
-      g.some((g) => hasJob(a, g.role)),
-      'Không tìm thấy tài khoản',
-      404,
-      'NOT_FOUND',
-    );
+    need(await canViewAccount(c, a.id, id), 'Không tìm thấy tài khoản', 404, 'NOT_FOUND');
   }
   return r;
 }
@@ -85,6 +76,7 @@ async function dto(c: DB, a: Actor, r: any) {
     platform: { id: r.platform_id, name: r.platform_name, enabled: r.platform_enabled },
     version: r.version,
     sharing_version: r.sharing_version,
+    inherit_platform_viewers: r.inherit_platform_viewers,
     updated_at: r.updated_at,
     has_password: !!r.current_credential_version_id,
     capabilities: {
@@ -96,11 +88,7 @@ async function dto(c: DB, a: Actor, r: any) {
     },
     ...(admin
       ? {
-          viewers: await rows(
-            c,
-            `SELECT g.user_id,u.name,g.role,g.valid_to,g.revoked_at FROM account_grants g JOIN users u ON u.id=g.user_id WHERE g.account_id=$1 ORDER BY u.name,g.role`,
-            [r.id],
-          ),
+          viewers: await effectiveViewers(c, r.id),
         }
       : {}),
   };
@@ -117,68 +105,26 @@ const secretSchema = z
   .max(10000)
   .refine((v) => !!v.trim(), 'Mật khẩu không được chỉ có khoảng trắng');
 async function viewers(c: DB, a: Actor, id: string, b: any) {
-  const ids = z
-    .array(z.uuid())
-    .max(500)
-    .parse(b.viewer_ids || []);
-  need(new Set(ids).size === ids.length, 'Người xem bị trùng', 422, 'VALIDATION');
-  const desired: { user: string; role: string; until: string | null }[] = [];
-  const old = await rows(
-    c,
-    'SELECT * FROM account_grants WHERE account_id=$1 AND revoked_at IS NULL',
-    [id],
-  );
-  for (const uid of ids) {
-    need(
-      await one(c, 'SELECT id FROM users WHERE id=$1 AND active', [uid]),
-      'Người xem phải là tài khoản đang hoạt động',
-      422,
-      'VIEWER_INVALID',
-    );
-    const u = await actor(c, uid);
-    const jobs = [
-      ...new Set(u.grants.filter((g) => g.kind === 'JOB').map((g) => g.role)),
-    ] as string[];
-    need(jobs.length, 'Người xem cần chuyên môn đang hiệu lực', 422, 'VALIDATION');
-    const requested = b.viewer_roles?.[uid];
-    const previous = old.filter((g) => g.user_id === uid);
-    if (requested) {
-      const roles = z.array(z.string()).min(1).parse(requested);
-      need(
-        roles.every((r) => jobs.includes(r)) && new Set(roles).size === roles.length,
-        'Chuyên môn chia sẻ không hợp lệ',
-        422,
-        'VALIDATION',
-      );
-      for (const role of roles)
-        desired.push({
-          user: uid,
-          role,
-          until: previous.find((g) => g.role === role)?.valid_to || null,
-        });
-    } else if (previous.length) {
-      for (const g of previous) desired.push({ user: uid, role: g.role, until: g.valid_to });
-    } else {
-      need(
-        jobs.length === 1,
-        'Chọn chuyên môn áp dụng cho người có nhiều vai trò',
-        422,
-        'SHARING_ROLE_REQUIRED',
-      );
-      desired.push({ user: uid, role: jobs[0], until: null });
-    }
-  }
-  await c.query(
-    "UPDATE account_grants SET revoked_at=now(),revoke_reason='Điều chỉnh danh sách người xem' WHERE account_id=$1 AND revoked_at IS NULL",
-    [id],
-  );
-  for (const g of desired)
+  const ids = await viewerIds(c, b.viewer_ids || []);
+  const before = await effectiveViewers(c, id);
+  const r = await one(c, 'SELECT platform_id FROM platform_accounts WHERE id=$1', [id]);
+  const inherited = await rows(c, 'SELECT user_id FROM platform_viewers WHERE platform_id=$1', [
+    r.platform_id,
+  ]);
+  // An explicit account selection can deny inherited viewers as well as add individuals.
+  await c.query('DELETE FROM account_viewer_overrides WHERE account_id=$1', [id]);
+  for (const uid of new Set([...ids, ...inherited.map((g) => g.user_id)]))
     await c.query(
-      'INSERT INTO account_grants(account_id,user_id,role,valid_to,granted_by,granted_at) VALUES($1,$2,$3,$4,$5,now()) ON CONFLICT(account_id,user_id,role) DO UPDATE SET revoked_at=NULL,valid_to=EXCLUDED.valid_to,granted_by=coalesce(account_grants.granted_by,EXCLUDED.granted_by),granted_at=coalesce(account_grants.granted_at,EXCLUDED.granted_at),revoke_reason=NULL',
-      [id, g.user, g.role, g.until, a.id],
+      'INSERT INTO account_viewer_overrides(account_id,user_id,allowed,granted_by) VALUES($1,$2,$3,$4)',
+      [id, uid, ids.includes(uid), a.id],
     );
-  await c.query('UPDATE platform_accounts SET sharing_version=sharing_version+1 WHERE id=$1', [id]);
+  await c.query(
+    'UPDATE platform_accounts SET sharing_version=sharing_version+1,inherit_platform_viewers=false WHERE id=$1',
+    [id],
+  );
+  await sharingHistory(c, a, 'ACCOUNT', id, before, await effectiveViewers(c, id));
 }
+
 async function addCredential(c: DB, a: Actor, r: any, secret: string, note: string) {
   const previous = r.current_credential_version_id
     ? await one(c, 'SELECT * FROM credential_versions WHERE id=$1 AND account_id=$2', [
@@ -227,7 +173,7 @@ export function accountRoutes(api: API) {
   api('GET', '/platforms', async (c, a) => {
     const all = await rows(
       c,
-      'SELECT id,name,enabled,version,sort_order FROM platforms ORDER BY sort_order,name',
+      'SELECT id,name,enabled,version,sort_order,sharing_version FROM platforms ORDER BY sort_order,name',
     );
     if (isAdmin(a)) return { items: all };
     const allowed = new Set<string>();
@@ -239,6 +185,54 @@ export function accountRoutes(api: API) {
       )
         allowed.add(r.platform_id);
     return { items: all.filter((r) => allowed.has(r.id)) };
+  });
+  api('GET', '/platforms/:id/viewers', async (c, a, b, q, p) => {
+    need(isAdmin(a));
+    const platform = await one(c, 'SELECT id,name,sharing_version FROM platforms WHERE id=$1', [
+      p.id,
+    ]);
+    need(platform, 'Không tìm thấy nền tảng', 404, 'NOT_FOUND');
+    return {
+      ...platform,
+      items: await rows(
+        c,
+        'SELECT u.id AS user_id,u.name,u.username FROM platform_viewers v JOIN users u ON u.id=v.user_id AND u.active WHERE v.platform_id=$1 ORDER BY u.name',
+        [p.id],
+      ),
+    };
+  });
+  api('PUT', '/platforms/:id/viewers', async (c, a, b, q, p) => {
+    need(isAdmin(a));
+    const platform = await one(c, 'SELECT * FROM platforms WHERE id=$1 FOR UPDATE', [p.id]);
+    need(platform, 'Không tìm thấy nền tảng', 404, 'NOT_FOUND');
+    version({ version: platform.sharing_version }, b.expected_sharing_version);
+    const ids = await viewerIds(c, b.viewer_ids || []);
+    const before = await rows(c, 'SELECT user_id FROM platform_viewers WHERE platform_id=$1', [
+      p.id,
+    ]);
+    await c.query('DELETE FROM platform_viewers WHERE platform_id=$1', [p.id]);
+    for (const uid of ids)
+      await c.query(
+        'INSERT INTO platform_viewers(platform_id,user_id,granted_by) VALUES($1,$2,$3)',
+        [p.id, uid, a.id],
+      );
+    await c.query('UPDATE platforms SET sharing_version=sharing_version+1 WHERE id=$1', [p.id]);
+    await c.query(
+      'UPDATE platform_accounts SET sharing_version=sharing_version+1 WHERE platform_id=$1',
+      [p.id],
+    );
+    await sharingHistory(c, a, 'PLATFORM', p.id, before, ids);
+    return { ok: true };
+  });
+  api('GET', '/account-sharing-history', async (c, a, b, q) => {
+    need(isAdmin(a));
+    return {
+      items: await rows(
+        c,
+        `SELECT h.*,u.name AS actor_name FROM account_sharing_history h JOIN users u ON u.id=h.actor_id WHERE ($1='' OR h.object_id::text=$1) ORDER BY h.id DESC LIMIT 100`,
+        [q.object_id || ''],
+      ),
+    };
   });
   api('POST', '/platforms', async (c, a, b) => {
     need(isAdmin(a));
@@ -275,6 +269,8 @@ export function accountRoutes(api: API) {
       `SELECT a.*,p.name AS platform_name,p.enabled AS platform_enabled FROM platform_accounts a JOIN platforms p ON p.id=a.platform_id WHERE ($1='' OR a.platform_id::text=$1) AND (a.label ILIKE $2 OR a.login ILIKE $2) ORDER BY ${q.sort === 'name' ? 'a.label,a.id' : q.sort === 'platform' ? 'p.name,a.label,a.id' : 'a.updated_at DESC,a.id'}`,
       [q.platform_id || '', '%' + String(q.search || '').slice(0, 150) + '%'],
     );
+    if (q.viewer_id) need(isAdmin(a));
+    const filterViewer = q.viewer_id ? z.uuid().parse(q.viewer_id) : null;
     const visible = [];
     for (const r of data)
       if (
@@ -282,7 +278,7 @@ export function accountRoutes(api: API) {
           .then(() => true)
           .catch(() => false)
       )
-        visible.push(r);
+        if (!filterViewer || (await canViewAccount(c, filterViewer, r.id))) visible.push(r);
     const items = [];
     for (const r of visible.slice(offset, offset + limit)) items.push(await dto(c, a, r));
     return {
@@ -321,7 +317,7 @@ export function accountRoutes(api: API) {
       v.secret,
       'Lưu mật khẩu lần đầu',
     );
-    await viewers(c, a, r.id, b);
+    if (b.viewer_ids !== undefined) await viewers(c, a, r.id, b);
     return dto(c, a, await accountAccess(c, a, r.id));
   });
   api('PATCH', '/platform-accounts/:id', async (c, a, b, q, p) => {
@@ -349,6 +345,19 @@ export function accountRoutes(api: API) {
     await viewers(c, a, r.id, b);
     return dto(c, a, await accountAccess(c, a, r.id));
   });
+  api('DELETE', '/platform-accounts/:id/viewers', async (c, a, b, q, p) => {
+    need(isAdmin(a));
+    const r = await accountAccess(c, a, p.id, true);
+    version({ version: r.sharing_version }, b.expected_sharing_version);
+    const before = await effectiveViewers(c, r.id);
+    await c.query('DELETE FROM account_viewer_overrides WHERE account_id=$1', [r.id]);
+    await c.query(
+      'UPDATE platform_accounts SET sharing_version=sharing_version+1,inherit_platform_viewers=true WHERE id=$1',
+      [r.id],
+    );
+    await sharingHistory(c, a, 'ACCOUNT_INHERIT', r.id, before, await effectiveViewers(c, r.id));
+    return dto(c, a, await accountAccess(c, a, r.id));
+  });
   // Compatibility single-grant endpoints keep the role binding and expiry rules.
   api('POST', '/platform-accounts/:id/grants', async (c, a, b, q, p) => {
     need(isAdmin(a));
@@ -366,6 +375,10 @@ export function accountRoutes(api: API) {
       422,
       'VALIDATION',
     );
+    await c.query(
+      'INSERT INTO account_viewer_overrides(account_id,user_id,allowed,valid_to,granted_by) VALUES($1,$2,true,$3,$4) ON CONFLICT(account_id,user_id) DO UPDATE SET allowed=true,valid_to=EXCLUDED.valid_to,granted_by=EXCLUDED.granted_by',
+      [p.id, v.user_id, v.valid_to, a.id],
+    );
     const g = await one(
       c,
       'INSERT INTO account_grants(account_id,user_id,role,valid_to,granted_by,granted_at) VALUES($1,$2,$3,$4,$5,now()) ON CONFLICT(account_id,user_id,role) DO UPDATE SET revoked_at=NULL,valid_to=EXCLUDED.valid_to RETURNING *',
@@ -381,6 +394,10 @@ export function accountRoutes(api: API) {
     const g = await one(c, 'SELECT * FROM account_grants WHERE id=$1', [p.id]);
     need(g, 'Không tìm thấy quyền', 404, 'NOT_FOUND');
     await accountAccess(c, a, g.account_id, true);
+    await c.query(
+      'INSERT INTO account_viewer_overrides(account_id,user_id,allowed,granted_by) VALUES($1,$2,false,$3) ON CONFLICT(account_id,user_id) DO UPDATE SET allowed=false',
+      [g.account_id, g.user_id, a.id],
+    );
     await c.query(
       "UPDATE account_grants SET revoked_at=now(),revoke_reason='Thu hồi quyền' WHERE id=$1",
       [p.id],

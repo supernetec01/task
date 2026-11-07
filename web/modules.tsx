@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { api, fmt, iso, localInput } from './api';
 import {
   Form,
+  useHourlyRefresh,
   Loaded,
   useLoad,
   Empty,
@@ -29,6 +30,7 @@ export function Records({ module, me }: { module: string; me: any }) {
   const selectedKind = selected?.kind || kind || (kinds[0]?.[0] as string),
     config = conf.data?.kinds[selectedKind];
   const refresh = () => setRev((r) => r + 1);
+  useHourlyRefresh(refresh);
   const open = async (id: string) => {
     try {
       setSelected(await api('/records/' + id));
@@ -39,6 +41,7 @@ export function Records({ module, me }: { module: string; me: any }) {
   return (
     <>
       <div className="toolbar">
+        <button onClick={refresh}>Tải lại danh sách</button>
         <input
           className="search"
           aria-label="Tìm hồ sơ"
@@ -209,6 +212,7 @@ export function Requests({ me }: { me: any }) {
     [selected, setSelected] = useState<any>(),
     [creating, setCreating] = useState(false);
   const refresh = () => setRev((r) => r + 1);
+  useHourlyRefresh(refresh);
   const fields: Field[] = [
     { key: 'title', label: 'Tên đề nghị', required: true },
     {

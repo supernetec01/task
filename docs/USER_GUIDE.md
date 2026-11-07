@@ -1,5 +1,6 @@
 # Hướng dẫn sử dụng theo vai trò
 
+> Các luồng HR, lương/thưởng, cấp tài khoản từ hồ sơ, chia sẻ nền tảng/account và form task mới được hướng dẫn tại [Bản sau duyệt QC](RELEASE-APPROVED-20261107.md). Quyết định mới thay thế phạm vi HR/share cũ.
 ## Admin
 
 Đăng nhập tài khoản đã bootstrap. Vào **Đội ngũ & phân quyền** để tạo nhóm/người dùng; chọn quản lý và người duyệt mặc định. Cấp ít nhất một chuyên môn JOB và quyền ACCESS phù hợp. Chuyên môn cho biết dữ liệu vị trí nào được đọc; ACCESS xác định giao/duyệt theo cá nhân/nhóm/toàn tổ chức. Có thể cấp nhiều JOB; role hết hạn theo đúng thời điểm, không phải tự chuyển thành cuối ngày.

@@ -32,10 +32,7 @@ export function Reports({ me, onTask }: { me: any; onTask: (id: string) => void 
     [revision, setRevision] = useState('');
   const list = useLoad('/reports/submitted?period=' + period, rev),
     live = useLoad('/reports/live?period=' + period, rev);
-  const selected = useLoad(
-    '/report-revisions/' + (revision || '00000000-0000-0000-0000-000000000000'),
-    rev,
-  );
+  const selected = useLoad(revision ? '/report-revisions/' + revision : null, rev);
   const snap = mode === 'own' ? live.data : selected.data?.snapshot;
   const [role, setRole] = useState(''),
     [error, setError] = useState<any>(),

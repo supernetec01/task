@@ -14,8 +14,14 @@ async function start() {
     "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='tasks' AND column_name='template_snapshot'",
   );
   if (!templates.rowCount) throw Error('MIGRATION_REQUIRED');
-  const upgrade = await pool.query("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='platform_accounts' AND column_name='current_credential_version_id'");
+  const upgrade = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='platform_accounts' AND column_name='current_credential_version_id'",
+  );
   if (!upgrade.rowCount) throw Error('MIGRATION_REQUIRED');
+  const approved = await pool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='platform_accounts' AND column_name='inherit_platform_viewers'",
+  );
+  if (!approved.rowCount) throw Error('MIGRATION_REQUIRED');
   const app = await buildApp();
   await app.listen({ host, port });
   console.log(`Super Net is running on ${host}:${port}`);

@@ -1,5 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
+test.afterEach(async ({ page }) => {
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
 // Simulate the browser's real HTTP LAN security context. All network traffic is
 // fulfilled from this test's loopback server; no DNS or external host is contacted.
 async function lanOrigin(page: Page, localBase: string) {

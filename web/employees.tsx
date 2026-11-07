@@ -11,7 +11,9 @@ import {
   roleLabel,
   options,
   Field,
+  useHourlyRefresh,
 } from './ui';
+import { UserAccessWizard } from './user-access';
 import { TaskDrawer } from './task-drawer';
 import { useDebounced } from './accounts';
 const phaseNames = {
@@ -32,6 +34,9 @@ const documentNames = {
   QUALIFICATION: 'Bằng cấp / chứng chỉ',
   PHOTO: 'Ảnh hồ sơ',
   OTHER: 'Tài liệu khác',
+  PAYROLL: 'Lương / thưởng',
+  TAX: 'Thuế',
+  SOCIAL_INSURANCE: 'BHXH',
 };
 function day(v: any) {
   return v
@@ -40,7 +45,13 @@ function day(v: any) {
       )
     : 'Chưa bổ sung';
 }
-export function EmployeeDirectory({ me }: { me: any }) {
+export function EmployeeDirectory({
+  me,
+  initialSelected = '',
+}: {
+  me: any;
+  initialSelected?: string;
+}) {
   const [rev, setRev] = useState(0),
     [status, setStatus] = useState('active'),
     [search, setSearch] = useState(''),
@@ -49,20 +60,23 @@ export function EmployeeDirectory({ me }: { me: any }) {
     [phase, setPhase] = useState(''),
     [type, setType] = useState(''),
     [cursor, setCursor] = useState('0'),
-    [selected, setSelected] = useState(''),
+    [selected, setSelected] = useState(initialSelected),
     [create, setCreate] = useState(false),
-    [error, setError] = useState<any>();
+    [error, setError] = useState<any>(),
+    [showFilters, setShowFilters] = useState(false);
   const query = useDebounced(search),
     conf = useLoad('/employees/options');
   const filters = { status, search: query, team_id: team, position, phase, type };
   const list = useLoad('/employees?' + new URLSearchParams({ ...filters, cursor }), rev);
   const refresh = () => setRev((r) => r + 1);
+  useHourlyRefresh(refresh);
+  const canEdit = me.admin || me.grants.some((g: any) => g.kind === 'JOB' && g.role === 'HR');
   return (
     <>
       <div className="heading">
         <p className="muted">
-          Hồ sơ nhân viên trong phạm vi bạn được quản lý. Vị trí trong hồ sơ không tự thay đổi quyền
-          website.
+          Hồ sơ toàn công ty · Tự cập nhật mỗi 60 phút. Hồ sơ nhân viên và quyền đăng nhập được quản
+          lý riêng.
         </p>
         <div className="actions">
           <button
@@ -77,9 +91,12 @@ export function EmployeeDirectory({ me }: { me: any }) {
           >
             Xuất Excel
           </button>
-          <button className="primary" onClick={() => setCreate(true)}>
-            + Thêm nhân viên
-          </button>
+          <button onClick={refresh}>Tải lại danh sách</button>
+          {canEdit && (
+            <button className="primary" onClick={() => setCreate(true)}>
+              + Thêm nhân viên
+            </button>
+          )}
         </div>
       </div>
       <ErrorBox error={error} />
@@ -103,7 +120,7 @@ export function EmployeeDirectory({ me }: { me: any }) {
           Đã nghỉ việc
         </button>
       </div>
-      <div className="toolbar">
+      <div className="toolbar hr-toolbar">
         <input
           className="search"
           aria-label="Tìm nhân viên"
@@ -114,6 +131,14 @@ export function EmployeeDirectory({ me }: { me: any }) {
             setCursor('0');
           }}
         />
+        <button aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
+          Bộ lọc
+          {[team, position, phase, type].filter(Boolean).length
+            ? ` · ${[team, position, phase, type].filter(Boolean).length}`
+            : ''}
+        </button>
+      </div>
+      <div className="hr-filters" hidden={!showFilters}>
         {[
           {
             label: 'Bộ phận',
@@ -157,6 +182,17 @@ export function EmployeeDirectory({ me }: { me: any }) {
             ))}
           </select>
         ))}
+        <button
+          onClick={() => {
+            setTeam('');
+            setPosition('');
+            setPhase('');
+            setType('');
+            setCursor('0');
+          }}
+        >
+          Xóa bộ lọc
+        </button>
       </div>
       <Loaded data={list.data} error={list.error}>
         <div className="kpis">
@@ -165,9 +201,7 @@ export function EmployeeDirectory({ me }: { me: any }) {
             ['Đang thử việc', list.data?.summary.probation],
             [
               'Cần bổ sung hồ sơ',
-              list.data?.checklist_configured
-                ? list.data?.summary.incomplete
-                : 'Chưa chốt checklist',
+              list.data?.checklist_configured ? list.data?.summary.incomplete : '—',
             ],
           ].map(([label, value]) => (
             <div className="kpi" key={label}>
@@ -176,7 +210,11 @@ export function EmployeeDirectory({ me }: { me: any }) {
             </div>
           ))}
         </div>
-        <div className="panel tablewrap">
+        <p className="muted list-scope">
+          Số liệu theo bộ lọc hiện tại · {list.data?.total || 0} hồ sơ
+          {!list.data?.checklist_configured && ' · Chưa cấu hình checklist bắt buộc'}
+        </p>
+        <div className="panel tablewrap employee-list">
           <table>
             <thead>
               <tr>
@@ -190,8 +228,10 @@ export function EmployeeDirectory({ me }: { me: any }) {
             <tbody>
               {list.data?.items.map((e: any) => (
                 <tr key={e.id}>
-                  <td>
-                    <strong>{e.name}</strong>
+                  <td className="employee-name">
+                    <button className="text-link" onClick={() => setSelected(e.id)}>
+                      {e.name}
+                    </button>
                     <small className="row-meta">
                       {e.employee_code || 'Chưa có mã · Cần HR bổ sung'}
                     </small>
@@ -205,14 +245,14 @@ export function EmployeeDirectory({ me }: { me: any }) {
                         .join(' · ') || 'Chưa bổ sung vị trí'}
                     </small>
                   </td>
-                  <td>{day(e.joined_on)}</td>
-                  <td>
+                  <td className="employee-date">{day(e.joined_on)}</td>
+                  <td className="employee-phase">
                     <Badge>{(phaseNames as any)[e.employment_state]}</Badge>
                     <small className="row-meta">
                       {(typeNames as any)[e.employment_type] || 'Chưa bổ sung loại hình'}
                     </small>
                   </td>
-                  <td>
+                  <td className="employee-open">
                     <button onClick={() => setSelected(e.id)}>Mở hồ sơ</button>
                   </td>
                 </tr>
@@ -328,9 +368,21 @@ function EmployeeEditor({
   return (
     <Loaded data={data} error={error}>
       <Form
-        fields={fields}
+        fields={fields.filter((f) =>
+          ['employee_code', 'name', 'joined_on', 'team_id', 'phase', 'employment_type'].includes(
+            f.key,
+          ),
+        )}
+        extraFields={fields.filter(
+          (f) =>
+            !['employee_code', 'name', 'joined_on', 'team_id', 'phase', 'employment_type'].includes(
+              f.key,
+            ),
+        )}
+        extraTitle="Thông tin liên hệ, hợp đồng & liên kết"
+        childrenBeforeExtra
         initial={{
-          phase: 'PROBATION',
+          phase: employee?.employment_state === 'OFFICIAL' ? 'OFFICIAL' : 'PROBATION',
           employment_type: 'FULL_TIME',
           ...employee,
           phone: c.phone || '',
@@ -407,7 +459,8 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
     [tab, setTab] = useState('info'),
     [edit, setEdit] = useState(false),
     [leave, setLeave] = useState(false),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState(''),
+    [provision, setProvision] = useState(false);
   const { data: e, error } = useLoad('/employees/' + id, rev),
     conf = useLoad('/employees/options'),
     handover = useLoad(leave ? '/employees/' + id + '/handover' : null);
@@ -454,6 +507,7 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                   ['info', 'Thông tin'],
                   ['work', 'Công việc'],
                   ['documents', 'Tài liệu'],
+                  ['history', 'Lịch sử chỉnh sửa'],
                 ].map(([key, label]) => (
                   <button
                     role="tab"
@@ -498,7 +552,20 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                     </div>
                   ))}
                 </dl>
-                <p className="notice">CCCD, lương và thông tin nhận lương được kiểm quyền riêng.</p>
+                <p className="notice">
+                  Định danh, thuế, BHXH và ngân hàng: Admin / Ban lãnh đạo. Lương, thưởng: HR /
+                  Admin / Ban lãnh đạo.
+                </p>
+                {e.capabilities.payroll && (
+                  <SensitiveProfile
+                    e={e}
+                    payroll
+                    onSaved={() => {
+                      setNotice('Đã lưu lương / thưởng.');
+                      refresh();
+                    }}
+                  />
+                )}
                 {e.capabilities.sensitive && (
                   <SensitiveProfile
                     e={e}
@@ -517,6 +584,12 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
               >
                 <dl className="task-facts">
                   {[
+                    [
+                      'Tài khoản đăng nhập',
+                      e.linked_user
+                        ? `${e.linked_user.username} · ${e.linked_user.active ? 'Đang hoạt động' : 'Đã khóa'}`
+                        : 'Chưa liên kết tài khoản',
+                    ],
                     ['Bộ phận', team],
                     ['Quản lý', manager],
                     ['Ngày vào làm', day(e.joined_on)],
@@ -533,6 +606,9 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                     </div>
                   ))}
                 </dl>
+                {e.capabilities.provision_user && (
+                  <button onClick={() => setProvision(true)}>Cấp tài khoản cho nhân viên</button>
+                )}
                 <h3>Vị trí công việc</h3>
                 {e.positions.map((p: any) => (
                   <p key={p.id}>
@@ -561,6 +637,14 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                     Ghi nhận nghỉ việc
                   </button>
                 )}
+              </section>
+              <section
+                role="tabpanel"
+                id="employee-panel-history"
+                aria-labelledby="employee-tab-history"
+                hidden={tab !== 'history'}
+              >
+                {tab === 'history' && <EmployeeHistory e={e} revision={rev} />}
               </section>
               <section
                 role="tabpanel"
@@ -619,6 +703,18 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
           )}
         </Loaded>
       </TaskDrawer>
+      {provision && e && (
+        <Modal compact title={'Cấp tài khoản · ' + e.name} onClose={() => setProvision(false)}>
+          <UserAccessWizard
+            employee={e}
+            onCreated={() => {
+              setProvision(false);
+              setNotice('Đã cấp và liên kết tài khoản.');
+              refresh();
+            }}
+          />
+        </Modal>
+      )}
       {edit && e && (
         <Modal compact title={'Chỉnh sửa · ' + e.name} onClose={() => setEdit(false)}>
           <EmployeeEditor
@@ -709,14 +805,19 @@ function EmployeeDocuments({ e, onSaved }: any) {
           value={kind}
           onChange={(event) => {
             setKind(event.target.value);
-            if (event.target.value === 'IDENTITY') setClassification('SENSITIVE');
+            if (['IDENTITY', 'PAYROLL', 'TAX', 'SOCIAL_INSURANCE'].includes(event.target.value))
+              setClassification('SENSITIVE');
           }}
         >
           {Object.entries(documentNames).map(([value, label]) => (
             <option
               value={value}
               key={value}
-              disabled={value === 'IDENTITY' && !e.capabilities.sensitive}
+              disabled={
+                (['IDENTITY', 'TAX', 'SOCIAL_INSURANCE'].includes(value) &&
+                  !e.capabilities.sensitive) ||
+                (value === 'PAYROLL' && !e.capabilities.payroll)
+              }
             >
               {label}
             </option>
@@ -731,7 +832,9 @@ function EmployeeDocuments({ e, onSaved }: any) {
           onChange={(event) => setClassification(event.target.value)}
         >
           <option value="BASIC">Trong phạm vi nhân sự</option>
-          {e.capabilities.sensitive && <option value="SENSITIVE">Hồ sơ nhạy cảm</option>}
+          {(e.capabilities.sensitive || e.capabilities.payroll) && (
+            <option value="SENSITIVE">Hồ sơ nhạy cảm</option>
+          )}
         </select>
       </label>
       <p className="muted">Giấy tờ định danh, lương, BHXH và thuế phải chọn Hồ sơ nhạy cảm.</p>
@@ -748,38 +851,177 @@ function EmployeeDocuments({ e, onSaved }: any) {
     </form>
   );
 }
-function SensitiveProfile({ e, onSaved }: any) {
+function SensitiveProfile({ e, onSaved, payroll = false }: any) {
   const [open, setOpen] = useState(false),
-    { data, error } = useLoad(open ? '/employees/' + e.id + '/sensitive' : null);
+    { data, error } = useLoad(
+      open ? '/employees/' + e.id + (payroll ? '/payroll' : '/sensitive') : null,
+    );
   return (
     <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>Thông tin nhạy cảm · có quyền riêng</summary>
+      <summary>
+        {payroll
+          ? 'Lương / thưởng · HR, Admin và Ban lãnh đạo'
+          : 'Thông tin nhạy cảm · Admin và Ban lãnh đạo'}
+      </summary>
       <Loaded data={data} error={error}>
         {data && (
           <Form
-            fields={[
-              { key: 'salary', label: 'Thông tin lương' },
-              { key: 'identity_document', label: 'Giấy tờ định danh' },
-              { key: 'tax_id', label: 'Mã số thuế' },
-              { key: 'social_insurance', label: 'Mã số BHXH' },
-              { key: 'bank_name', label: 'Ngân hàng nhận lương' },
-              { key: 'bank_account', label: 'Tài khoản nhận lương' },
-              { key: 'notes', label: 'Ghi chú nhạy cảm', type: 'textarea' },
-            ]}
+            fields={(payroll
+              ? [
+                  { key: 'salary', label: 'Thông tin lương' },
+                  { key: 'bonus', label: 'Thông tin thưởng' },
+                  { key: 'notes', label: 'Ghi chú lương / thưởng', type: 'textarea' },
+                ]
+              : [
+                  { key: 'identity_document', label: 'Giấy tờ định danh' },
+                  { key: 'tax_id', label: 'Mã số thuế' },
+                  { key: 'social_insurance', label: 'Mã số BHXH' },
+                  { key: 'bank_name', label: 'Ngân hàng nhận lương' },
+                  { key: 'bank_account', label: 'Tài khoản nhận lương' },
+                  { key: 'notes', label: 'Ghi chú nhạy cảm', type: 'textarea' },
+                ]
+            ).map((f) => ({ ...f, readonly: !e.capabilities.edit }))}
             initial={data.data || { salary: '', identity_document: '', notes: '' }}
             onSubmit={async (v, key) => {
               await api(
-                '/employees/' + e.id + '/sensitive',
+                '/employees/' + e.id + (payroll ? '/payroll' : '/sensitive'),
                 { data: v, expected_version: e.version },
                 'PUT',
                 key,
               );
               onSaved();
             }}
-            label="Lưu thông tin nhạy cảm"
+            label={payroll ? 'Lưu lương / thưởng' : 'Lưu thông tin nhạy cảm'}
+            secondary={!e.capabilities.edit ? <span>Quyền chỉ xem</span> : undefined}
           />
         )}
       </Loaded>
     </details>
+  );
+}
+
+const historyLabels: Record<string, string> = {
+  employee_code: 'Mã nhân sự',
+  name: 'Họ tên',
+  user_id: 'Tài khoản liên kết',
+  birthday: 'Ngày sinh',
+  joined_on: 'Ngày vào làm',
+  team_id: 'Bộ phận',
+  manager_id: 'Quản lý',
+  employment_state: 'Giai đoạn',
+  employment_type: 'Loại hình',
+  probation_end: 'Hết thử việc',
+  contract_date: 'Ngày ký hợp đồng',
+  contract_end: 'Hết hợp đồng',
+  left_on: 'Ngày nghỉ',
+  archived_at: 'Lưu trữ',
+  contact: 'Liên hệ',
+  'contact.phone': 'Điện thoại',
+  'contact.email': 'Email',
+  'contact.address': 'Địa chỉ',
+  'contact.emergency_name': 'Liên hệ khẩn cấp',
+  'contact.emergency_phone': 'Điện thoại khẩn cấp',
+  'contact.photo_asset_id': 'Ảnh hồ sơ',
+  positions: 'Vị trí',
+  salary: 'Lương',
+  bonus: 'Thưởng',
+  notes: 'Ghi chú',
+  identity_document: 'Định danh',
+  tax_id: 'Mã số thuế',
+  social_insurance: 'BHXH',
+  bank_name: 'Ngân hàng',
+  bank_account: 'Số tài khoản',
+};
+function EmployeeHistory({ e, revision }: any) {
+  const [category, setCategory] = useState('BASIC'),
+    [cursor, setCursor] = useState('0');
+  const history = useLoad(
+    `/employees/${e.id}/history?category=${category}&cursor=${cursor}`,
+    revision,
+  );
+  const conf = useLoad('/employees/options');
+  const flatten = (value: any): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [key, v] of Object.entries(value || {})) {
+      if (key === 'contact' && v && typeof v === 'object')
+        for (const [sub, x] of Object.entries(v)) out['contact.' + sub] = x;
+      else out[key] = v;
+    }
+    return out;
+  };
+  const changes = (r: any) => {
+    const before = flatten(r.before),
+      after = flatten(r.after);
+    return [...new Set([...Object.keys(before), ...Object.keys(after)])]
+      .filter((k) => JSON.stringify(before[k] ?? null) !== JSON.stringify(after[k] ?? null))
+      .map((key) => ({ key, before: before[key], after: after[key] }));
+  };
+  const text = (v: any, key: string): string => {
+    if (v === null || v === undefined || v === '') return 'Chưa có';
+    if (Array.isArray(v)) return v.map((x) => roleLabel[x] || x).join(', ');
+    if (key === 'team_id')
+      return conf.data?.teams.find((t: any) => t.id === v)?.name || 'Bộ phận đã lưu trữ';
+    if (key === 'manager_id')
+      return conf.data?.managers.find((u: any) => u.id === v)?.name || 'Quản lý đã lưu trữ';
+    if (key === 'user_id')
+      return e.linked_user?.id === v ? e.linked_user.username : 'Tài khoản đã lưu trữ';
+    if (key === 'contact.photo_asset_id') return 'Đã chọn ảnh hồ sơ';
+    if (typeof v === 'boolean') return v ? 'Có' : 'Không';
+    return (phaseNames as any)[v] || (typeNames as any)[v] || String(v);
+  };
+  return (
+    <div>
+      <h3>Lịch sử chỉnh sửa</h3>
+      <p className="muted">
+        Lưu người sửa, thời gian và giá trị trước / sau. Lịch sử chỉ được bổ sung, không ghi đè.
+      </p>
+      <select
+        aria-label="Loại lịch sử nhân sự"
+        value={category}
+        onChange={(ev) => {
+          setCategory(ev.target.value);
+          setCursor('0');
+        }}
+      >
+        <option value="BASIC">Hồ sơ cơ bản</option>
+        {e.capabilities.payroll && <option value="PAYROLL">Lương / thưởng</option>}
+        {e.capabilities.sensitive && <option value="SENSITIVE">Thông tin nhạy cảm</option>}
+      </select>
+      <Loaded {...history}>
+        {history.data?.items.map((r: any) => (
+          <article className="history-entry" key={r.id}>
+            <strong>{r.actor_name}</strong>
+            <small className="row-meta">
+              {fmt(r.created_at)} ·{' '}
+              {r.action === 'PROFILE_CREATED'
+                ? 'Tạo hồ sơ'
+                : r.action === 'USER_LINKED'
+                  ? 'Liên kết tài khoản'
+                  : 'Cập nhật hồ sơ'}
+            </small>
+            <details>
+              <summary>Xem thay đổi</summary>
+              {changes(r).map((change) => (
+                <div className="change-row" key={change.key}>
+                  <strong>{historyLabels[change.key] || change.key}</strong>
+                  <div>
+                    <del>{text(change.before, change.key)}</del>
+                    <br />
+                    <ins>{text(change.after, change.key)}</ins>
+                  </div>
+                </div>
+              ))}
+            </details>
+          </article>
+        ))}
+        {history.data?.items.length === 0 && (
+          <Empty>Chưa có chỉnh sửa được ghi nhận từ bản nâng cấp này.</Empty>
+        )}
+        {cursor !== '0' && <button onClick={() => setCursor('0')}>Về đầu</button>}
+        {history.data?.next_cursor && (
+          <button onClick={() => setCursor(history.data.next_cursor)}>Lịch sử trước</button>
+        )}
+      </Loaded>
+    </div>
   );
 }

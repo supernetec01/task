@@ -56,12 +56,21 @@ function CustomDates({ value, onChange }: any) {
     </details>
   );
 }
-export function UserAccessWizard({ onCreated }: { onCreated: (id: string) => void }) {
+export function UserAccessWizard({
+  onCreated,
+  employee,
+}: {
+  onCreated: (id: string) => void;
+  employee?: any;
+}) {
   const { data, error } = useLoad('/user-access-options');
-  const [roles, setRoles] = useState<string[]>([]),
+  const [roles, setRoles] = useState<string[]>(
+      employee?.positions?.filter((p: any) => !p.effective_to).map((p: any) => p.position_code) ||
+        [],
+    ),
     [access, setAccess] = useState('EMPLOYEE'),
     [scope, setScope] = useState('SELF'),
-    [team, setTeam] = useState(''),
+    [team, setTeam] = useState(employee?.team_id || ''),
     [manager, setManager] = useState(''),
     [same, setSame] = useState(true),
     [dates, setDates] = useState({ from: '', to: '' });
@@ -121,7 +130,14 @@ export function UserAccessWizard({ onCreated }: { onCreated: (id: string) => voi
               ]
             : []),
         ]}
-        initial={{ team_id: '', manager_id: '', reviewer_id: '', employee_id: '' }}
+        initial={{
+          name: employee?.name || '',
+          email: employee?.contact?.email || '',
+          team_id: employee?.team_id || '',
+          manager_id: '',
+          reviewer_id: '',
+          employee_id: employee?.id || '',
+        }}
         onChange={(v) => {
           setTeam(v.team_id || '');
           setManager(v.manager_id || '');
@@ -167,7 +183,7 @@ export function UserAccessWizard({ onCreated }: { onCreated: (id: string) => voi
               onChange={(e) => {
                 setAccess(e.target.value);
                 setScope(
-                  e.target.value === 'ADMIN'
+                  ['ADMIN', 'EXECUTIVE'].includes(e.target.value)
                     ? 'ALL'
                     : e.target.value === 'EMPLOYEE'
                       ? 'SELF'
@@ -175,7 +191,7 @@ export function UserAccessWizard({ onCreated }: { onCreated: (id: string) => voi
                 );
               }}
             >
-              {['EMPLOYEE', 'MANAGER', 'BOSS', 'ADMIN'].map((r) => (
+              {['EMPLOYEE', 'MANAGER', 'BOSS', 'ADMIN', 'EXECUTIVE'].map((r) => (
                 <option key={r} value={r}>
                   {roleLabel[r]}
                 </option>
@@ -189,7 +205,7 @@ export function UserAccessWizard({ onCreated }: { onCreated: (id: string) => voi
               value={scope}
               onChange={(e) => setScope(e.target.value)}
             >
-              {(access === 'ADMIN'
+              {(['ADMIN', 'EXECUTIVE'].includes(access)
                 ? ['ALL']
                 : access === 'EMPLOYEE'
                   ? ['SELF']

@@ -22,7 +22,8 @@ import {
 import { recordKinds, recordSchema } from './record-config.js';
 import { recordAccess, fileRoutes } from './files.js';
 import { metricRoutes } from './metrics.js';
-import { employeeRoutes, hrAccess, sensitiveAllowed } from './employees.js';
+import { employeeRevision, basicSnapshot } from './employee-history.js';
+import { employeeRoutes, hrAccess, sensitiveAllowed, payrollAllowed } from './employees.js';
 import { accountRoutes } from './accounts.js';
 import { taskAccess } from './tasks.js';
 const requestKinds = [
@@ -236,6 +237,14 @@ export function moduleRoutes(api: API) {
             'Có sự kiện bắt đầu thử việc; HR kiểm tra thưởng tuyển dụng, không tự tính tiền',
             e.id,
           );
+    await employeeRevision(
+      c,
+      a,
+      e.id,
+      'PROBATION_STARTED',
+      basicSnapshot(e),
+      basicSnapshot(await hrAccess(c, a, e.id)),
+    );
     await audit(c, a, 'PROBATION_STARTED', 'employee', e.id);
     return { ok: true };
   });
@@ -264,6 +273,14 @@ export function moduleRoutes(api: API) {
       'INSERT INTO employment_events(employee_id,kind,business_date,actor_id,payload) VALUES($1,$2,$3,$4,$5)',
       [e.id, v.state, v.date, a.id, JSON.stringify({ reason: v.reason })],
     );
+    await employeeRevision(
+      c,
+      a,
+      e.id,
+      'EMPLOYMENT_CHANGED',
+      basicSnapshot(e),
+      basicSnapshot(await hrAccess(c, a, e.id)),
+    );
     await audit(c, a, 'EMPLOYMENT_CHANGED', 'employee', e.id, { state: v.state });
     return { ok: true };
   });
@@ -271,7 +288,12 @@ export function moduleRoutes(api: API) {
     const e = await hrAccess(c, a, p.id);
     need(await sensitiveAllowed(c, a, e));
     await audit(c, a, 'HR_SENSITIVE_READ', 'employee', e.id);
-    return { data: e.sensitive_cipher ? JSON.parse(decipher(e.sensitive_cipher)) : null };
+    const data = e.sensitive_cipher ? JSON.parse(decipher(e.sensitive_cipher)) : null;
+    if (data) {
+      delete data.salary;
+      delete data.bonus;
+    }
+    return { data };
   });
   api('PUT', '/employees/:id/sensitive', async (c, a, b, q, p) => {
     const e = await hrAccess(c, a, p.id, true);
@@ -279,7 +301,7 @@ export function moduleRoutes(api: API) {
     version(e, b.expected_version);
     const v = z
       .object({
-        salary: z.string().max(100),
+        salary: z.string().max(100).optional(),
         identity_document: z.string().max(100),
         tax_id: z.string().max(100).default(''),
         social_insurance: z.string().max(100).default(''),
@@ -288,11 +310,74 @@ export function moduleRoutes(api: API) {
         notes: z.string().max(5000),
       })
       .parse(b.data);
+    const old = e.sensitive_cipher ? JSON.parse(decipher(e.sensitive_cipher)) : {};
+    const next = { ...old, ...v };
+    let payrollCipher = e.payroll_cipher;
+    // Compatibility for a cached older Admin form: split its salary into payroll storage/history.
+    if (v.salary !== undefined) {
+      const previousPayroll = e.payroll_cipher ? JSON.parse(decipher(e.payroll_cipher)) : old;
+      const beforePayroll = {
+        salary: previousPayroll.salary || '',
+        bonus: previousPayroll.bonus || '',
+        notes: e.payroll_cipher ? previousPayroll.notes || '' : '',
+      };
+      const afterPayroll = { ...beforePayroll, salary: v.salary };
+      payrollCipher = cipher(JSON.stringify(afterPayroll));
+      await employeeRevision(c, a, e.id, 'PAYROLL_UPDATED', beforePayroll, afterPayroll, 'PAYROLL');
+      delete next.salary;
+    } else if (old.salary !== undefined) next.salary = old.salary;
+    else delete next.salary;
+    await employeeRevision(c, a, e.id, 'SENSITIVE_UPDATED', old, next, 'SENSITIVE');
     await c.query(
-      'UPDATE employee_profiles SET sensitive_cipher=$2,version=version+1 WHERE id=$1',
-      [e.id, cipher(JSON.stringify(v))],
+      'UPDATE employee_profiles SET sensitive_cipher=$2,payroll_cipher=$3,version=version+1 WHERE id=$1',
+      [e.id, cipher(JSON.stringify(next)), payrollCipher],
     );
     await audit(c, a, 'HR_SENSITIVE_UPDATED', 'employee', e.id);
+    return { ok: true };
+  });
+  api('GET', '/employees/:id/payroll', async (c, a, b, q, p) => {
+    const e = await hrAccess(c, a, p.id);
+    need(payrollAllowed(a));
+    const stored = e.payroll_cipher
+      ? JSON.parse(decipher(e.payroll_cipher))
+      : e.sensitive_cipher
+        ? JSON.parse(decipher(e.sensitive_cipher))
+        : {};
+    return {
+      data: {
+        salary: stored.salary || '',
+        bonus: stored.bonus || '',
+        notes: e.payroll_cipher ? stored.notes || '' : '',
+      },
+    };
+  });
+  api('PUT', '/employees/:id/payroll', async (c, a, b, q, p) => {
+    const e = await hrAccess(c, a, p.id, true);
+    need(payrollAllowed(a));
+    version(e, b.expected_version);
+    const v = z
+      .object({
+        salary: z.string().max(100),
+        bonus: z.string().max(1000).default(''),
+        notes: z.string().max(5000).default(''),
+      })
+      .strict()
+      .parse(b.data);
+    const stored = e.payroll_cipher
+      ? JSON.parse(decipher(e.payroll_cipher))
+      : e.sensitive_cipher
+        ? JSON.parse(decipher(e.sensitive_cipher))
+        : {};
+    const before = {
+      salary: stored.salary || '',
+      bonus: stored.bonus || '',
+      notes: e.payroll_cipher ? stored.notes || '' : '',
+    };
+    await c.query('UPDATE employee_profiles SET payroll_cipher=$2,version=version+1 WHERE id=$1', [
+      e.id,
+      cipher(JSON.stringify(v)),
+    ]);
+    await employeeRevision(c, a, e.id, 'PAYROLL_UPDATED', before, v, 'PAYROLL');
     return { ok: true };
   });
   api('POST', '/approval-policies', async (c, a, b) => {

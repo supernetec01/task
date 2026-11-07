@@ -131,11 +131,15 @@ export function validatePayload(tmpl: any, payload: any) {
     if (['string', 'reference'].includes(f.type)) valid = typeof v === 'string';
     if (f.type === 'boolean') valid = typeof v === 'boolean';
     if (f.type === 'decimal') valid = typeof v === 'number' && Number.isFinite(v);
-    if (['array', 'metric_array', 'reference_array', 'link_array'].includes(f.type))
+    if (['array', 'metric_array', 'reference_array', 'link_array', 'user_array'].includes(f.type))
       valid = Array.isArray(v);
     if (f.type === 'url') valid = validURL(v);
     if (f.type === 'date') valid = z.iso.date().safeParse(v).success;
     if (f.type === 'datetime') valid = z.iso.datetime({ offset: true }).safeParse(v).success;
+    if (f.type === 'user_array')
+      valid = z.array(z.uuid()).max(100).safeParse(v).success && new Set(v).size === v.length;
+    if (f.type === 'reference_array')
+      valid = Array.isArray(v) && v.every((x) => typeof x === 'string' && !!x.trim());
     if (f.type === 'link_array' && Array.isArray(v)) valid = v.every(validURL);
     need(valid, `Dữ liệu ${f.label} không đúng kiểu`, 422, 'VALIDATION');
     if (f.items && Array.isArray(v))
@@ -355,23 +359,31 @@ export function taskRoutes(api: API) {
   api('POST', '/tasks', createTask);
   api('GET', '/tasks', async (c, a, b, q) => {
     const mode = q.mode === 'team' && management(a) ? 'team' : 'mine';
+    const filterSql = `FROM tasks t JOIN users u ON u.id=t.owner_id WHERE ((t.owner_id=$1 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='JOB' AND g.role=t.role AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()))) OR EXISTS(SELECT 1 FROM supporters s JOIN grants g ON g.user_id=s.user_id AND g.role=s.role AND g.kind='JOB' WHERE s.task_id=t.id AND t.status<>'DRAFT' AND s.user_id=$1 AND s.status IN ('PENDING','ACCEPTED') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now())) OR ($2 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='ACCESS' AND g.role IN ('ADMIN','BOSS','MANAGER') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()) AND (g.scope='ALL' OR (g.scope='TEAM' AND g.team_id=u.team_id))))) AND ($3='' OR t.title ILIKE '%'||$3||'%' OR t.code::text=$3) AND ($4='' OR t.status=$4) AND ($5='' OR t.role=$5) AND ($6='' OR t.owner_id::text=$6)`;
+    const filterArgs = [
+      a.id,
+      mode === 'team',
+      String(q.search || '').slice(0, 255),
+      q.status || '',
+      q.role || '',
+      q.owner || '',
+    ];
     const accessible = await rows(
       c,
-      `SELECT t.id FROM tasks t JOIN users u ON u.id=t.owner_id WHERE ((t.owner_id=$1 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='JOB' AND g.role=t.role AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()))) OR EXISTS(SELECT 1 FROM supporters s JOIN grants g ON g.user_id=s.user_id AND g.role=s.role AND g.kind='JOB' WHERE s.task_id=t.id AND t.status<>'DRAFT' AND s.user_id=$1 AND s.status IN ('PENDING','ACCEPTED') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now())) OR ($2 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='ACCESS' AND g.role IN ('ADMIN','BOSS','MANAGER') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()) AND (g.scope='ALL' OR (g.scope='TEAM' AND g.team_id=u.team_id))))) AND ($3='' OR t.title ILIKE '%'||$3||'%' OR t.code::text=$3) AND ($4='' OR t.status=$4) AND ($5='' OR t.role=$5) AND ($6='' OR t.owner_id::text=$6) ORDER BY t.updated_at DESC LIMIT 101 OFFSET $7`,
-      [
-        a.id,
-        mode === 'team',
-        String(q.search || '').slice(0, 255),
-        q.status || '',
-        q.role || '',
-        q.owner || '',
-        Math.max(0, Number(q.cursor) || 0),
-      ],
+      'SELECT t.id ' + filterSql + ' ORDER BY t.updated_at DESC,t.id LIMIT 101 OFFSET $7',
+      [...filterArgs, Math.max(0, Number(q.cursor) || 0)],
+    );
+    const summary = await one(
+      c,
+      `SELECT count(*)::int AS total,count(*) FILTER(WHERE t.status='DONE')::int AS done,count(*) FILTER(WHERE t.timing='ON_TIME')::int AS on_time,count(*) FILTER(WHERE t.status NOT IN ('DONE','CANCELLED','DECLINED','DRAFT'))::int AS open,jsonb_build_object('ASSIGNED',count(*) FILTER(WHERE t.status='ASSIGNED'),'IN_PROGRESS',count(*) FILTER(WHERE t.status='IN_PROGRESS'),'SUBMITTED',count(*) FILTER(WHERE t.status='SUBMITTED'),'CHANGES_REQUESTED',count(*) FILTER(WHERE t.status='CHANGES_REQUESTED'),'DONE',count(*) FILTER(WHERE t.status='DONE')) AS status_counts ` +
+        filterSql,
+      filterArgs,
     );
     const items = [];
     for (const t of accessible.slice(0, 100)) items.push(await taskDetail(c, a, t.id));
     return {
       items,
+      summary,
       next_cursor: accessible.length > 100 ? String((Number(q.cursor) || 0) + 100) : null,
     };
   });
@@ -391,7 +403,10 @@ export function taskRoutes(api: API) {
     const { t, owner } = await taskAccess(c, a, p.id, true);
     need(owner);
     version(t, v.expected_version);
-    if (v.payload) validatePayload(taskTemplate(t), v.payload);
+    if (v.payload) {
+      validatePayload(taskTemplate(t), v.payload);
+      await validateTaskWork(c, taskTemplate(t), v.payload, t.payload, false);
+    }
     if (v.state === 'IN_PROGRESS') {
       await updateProgress(c, a, v, t.id);
       if (v.payload)
@@ -473,6 +488,7 @@ export function taskRoutes(api: API) {
       'STATE',
     );
     validatePayload(taskTemplate(t), b.values);
+    await validateTaskWork(c, taskTemplate(t), b.values, t.payload, false);
     await c.query('UPDATE tasks SET payload=$2,version=version+1,updated_at=now() WHERE id=$1', [
       t.id,
       JSON.stringify(b.values),
@@ -912,12 +928,32 @@ export async function submitTask(c: DB, a: Actor, b: any, id: string) {
     ...tmpl.fields.filter((f: any) => f.required_at_action).map((f: any) => f.key),
   ])
     need(
-      payload[f] !== undefined && payload[f] !== '' && payload[f] !== null,
+      hasValue(payload[f]),
       `Cần bổ sung ${tmpl.fields.find((field: any) => field.key === f)?.label || 'thông tin bắt buộc của mẫu'} khi nộp`,
       422,
       'VALIDATION',
     );
-  const hasArtifact = v.artifact_refs.length || v.links.length;
+  await validateTaskWork(c, tmpl, payload, t.payload, true);
+  if (tmpl.output_policy === 'FILE_REQUIRED') {
+    const files = await rows(
+      c,
+      'SELECT filename FROM assets WHERE id=ANY($1::uuid[]) AND task_id=$2',
+      [v.artifact_refs, t.id],
+    );
+    need(
+      files.some((f) => /\.(pdf|docx|xlsx|txt|csv)$/i.test(f.filename)),
+      'Phân tích sản phẩm cần một file tài liệu kết quả (PDF, DOCX, XLSX, TXT hoặc CSV). Tải file và chọn làm kết quả.',
+      422,
+      'DOCUMENT_REQUIRED',
+    );
+  }
+  const resultLinks = [
+    ...new Set([
+      ...v.links,
+      ...(validURL(payload.publication_url) ? [payload.publication_url as string] : []),
+    ]),
+  ];
+  const hasArtifact = v.artifact_refs.length || resultLinks.length;
   need(v.result_text.trim() || hasArtifact, 'Cần kết quả văn bản hoặc tệp/link', 422, 'VALIDATION');
   if (tmpl.output_policy === 'ARTIFACT_REQUIRED')
     need(hasArtifact, 'Loại việc này cần tệp hoặc link đầu ra', 422, 'VALIDATION');
@@ -945,7 +981,7 @@ export async function submitTask(c: DB, a: Actor, b: any, id: string) {
       t.id,
       v.result_text,
       JSON.stringify({ ...payload, artifact_refs: v.artifact_refs }),
-      JSON.stringify(v.links),
+      JSON.stringify(resultLinks),
       t.due_at,
     ],
   );
@@ -957,4 +993,76 @@ export async function submitTask(c: DB, a: Actor, b: any, id: string) {
   if (t.reviewer_id)
     await notify(c, t.reviewer_id, 'submission:' + s.id, 'Có công việc chờ duyệt', t.id);
   return taskDetail(c, a, t.id);
+}
+
+function hasValue(v: any) {
+  return (
+    v !== undefined &&
+    v !== null &&
+    (typeof v === 'string' ? !!v.trim() : Array.isArray(v) ? v.length > 0 : true)
+  );
+}
+async function validateTaskWork(c: DB, tmpl: any, payload: any, previous: any, submit: boolean) {
+  for (const f of tmpl.fields.filter((f: any) => f.type === 'user_array')) {
+    const ids = payload[f.key] || [];
+    if (ids.length)
+      need(
+        (await rows(c, 'SELECT id FROM users WHERE active AND id=ANY($1::uuid[])', [ids]))
+          .length === ids.length,
+        'Nhân sự tham gia phải có tài khoản đang hoạt động',
+        422,
+        'PARTICIPANT_INVALID',
+      );
+  }
+  for (const [start, end] of [
+    ['start_on', 'end_on'],
+    ['window_start', 'window_end'],
+    ['start_at', 'end_at'],
+  ])
+    if (payload[start] && payload[end])
+      need(
+        new Date(payload[start]) <= new Date(payload[end]),
+        'Ngày kết thúc phải từ ngày bắt đầu trở đi',
+        422,
+        'DATE_ORDER',
+      );
+  if (!tmpl.workflow?.length) return;
+  const steps = tmpl.workflow;
+  const from = steps.findIndex((s: any) => s.key === (previous.workflow_step || steps[0].key));
+  const to = steps.findIndex((s: any) => s.key === (payload.workflow_step || steps[0].key));
+  need(
+    to >= 0 && to <= Math.max(0, from) + 1,
+    'Chuyển lần lượt từng bước của quy trình sản xuất video',
+    422,
+    'WORKFLOW_ORDER',
+  );
+  const requiredSteps = submit ? steps : steps.slice(0, to);
+  for (const step of requiredSteps)
+    for (const key of step.fields)
+      need(
+        hasValue(payload[key]),
+        `Bước ${step.label}: cần bổ sung ${tmpl.fields.find((f: any) => f.key === key)?.label || key}`,
+        422,
+        'WORKFLOW_REQUIRED',
+      );
+  if (submit) {
+    need(
+      payload.publication_url && validURL(payload.publication_url),
+      'Cần link video đã đăng trên nền tảng',
+      422,
+      'PUBLICATION_REQUIRED',
+    );
+    need(
+      new Date(payload.published_at).getTime() <= Date.now() + 60000,
+      'Không thể ghi hoàn thành bằng thời điểm đăng trong tương lai',
+      422,
+      'PUBLICATION_FUTURE',
+    );
+    need(
+      new Date(payload.shoot_at) <= new Date(payload.published_at),
+      'Ngày đăng không thể trước ngày quay',
+      422,
+      'DATE_ORDER',
+    );
+  }
 }

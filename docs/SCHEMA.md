@@ -1,6 +1,6 @@
 # Mô hình dữ liệu thực thi
 
-`docs/reference/candidate-schema.sql` là thiết kế tham khảo, không chạy vào database ứng dụng. `migrations/001.sql` → `002.sql` → `003.sql` → `004.sql` là migration thực tế, atomic, có bảng `schema_migrations` và advisory lock ngăn hai lần migrate đồng thời.
+`docs/reference/candidate-schema.sql` là thiết kế tham khảo, không chạy vào database ứng dụng. `migrations/001.sql` → `002.sql` → `003.sql` → `007.sql` là migration thực tế, atomic, có bảng `schema_migrations` và advisory lock ngăn hai lần migrate đồng thời.
 
 | Khối | Bảng | Thiết kế áp dụng |
 |---|---|---|
@@ -25,3 +25,7 @@ Migration 004 bổ sung username duy nhất không phân biệt hoa/thường v�
 Migration 005 bổ sung task_templates/task_template_versions/task_template_roles (FK mapping và FK phiên bản hiện hành deferred), tasks.template_version_id/template_snapshot, task_comments, task_updates và staged_task_assets. Version/comment/update có trigger bất biến. Task mới giữ FK phiên bản và bản sao definition; task lịch sử giữ hợp đồng schema cũ trong snapshot, không gán nhầm FK tới schema mới. Tiến độ cũ được backfill từ PROGRESS event; không chuyển event thành tin chat.
 
 Migration 006 bổ sung platforms/FK account, credential current/previous cùng account, revision/snapshot, employee_code/link unique/positions/documents và assets.employee_id; các file employee không thể gắn đồng thời task/record hoặc shared. Sensitive tài liệu được kiểm HR_SENSITIVE riêng. settings_history/grant_changes là business metadata bất biến; audit cũ read-retired và không thu thập mới. Idempotency có authorization_fingerprint, không cache reveal và loại bỏ response.secret/ciphertext legacy; không xóa credential history.
+
+## Bổ sung sau duyệt QC (007)
+
+`employee_revisions` ghi trước/sau và actor/time bất biến. Dữ liệu BASIC là JSONB; PAYROLL/SENSITIVE mã hóa toàn bộ thay đổi, kiểm quyền riêng khi đọc. `employee_profiles.payroll_cipher` tách lương/thưởng khỏi định danh; lương legacy chỉ được đọc qua DTO payroll chọn đúng trường. `platform_viewers` cấp quyền theo nền tảng; `account_viewer_overrides` và `inherit_platform_viewers` xác định danh sách riêng/kế thừa. `account_sharing_history` bất biến. `account_grants` cũ được giữ làm lịch sử/tương thích, không dùng làm ACL hiện hành. Quyền ACCESS EXECUTIVE phải ALL và chỉ Admin cấp; HR_SENSITIVE legacy không mở định danh theo chính sách mới.

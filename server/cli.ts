@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { hash as passwordHash } from 'argon2';
 import { hiddenPrompt } from './secret-prompt.js';
 import { z } from 'zod';
-import { seedTemplateMigration } from './template-store.js';
+import { seedTemplateMigration, upgradeTaskForms } from './template-store.js';
 import { cliFailure, requireDatabaseConfiguration } from './cli-diagnostics.js';
 export async function migrate() {
   await tx(async (c) => {
@@ -19,6 +19,7 @@ export async function migrate() {
       if (applied.includes(file)) continue;
       await c.query(readFileSync(resolve('migrations', file), 'utf8'));
       if (file === '005.sql') await seedTemplateMigration(c);
+      if (file === '007.sql') await upgradeTaskForms(c);
       await c.query('INSERT INTO schema_migrations(version) VALUES($1)', [file]);
       console.log('Migration:', file);
     }

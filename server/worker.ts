@@ -60,6 +60,34 @@ export async function runJobs() {
     const today = localDate(),
       date = new Date(today + 'T12:00:00Z'),
       weekday = date.getUTCDay() || 7;
+    if (policy.contract_reminders_enabled) {
+      const hr = await rows(
+        c,
+        `SELECT DISTINCT u.id FROM users u JOIN grants g ON g.user_id=u.id
+        WHERE u.active AND g.kind='JOB' AND g.role='HR' AND g.revoked_at IS NULL
+        AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now())`,
+      );
+      const offsets = [...new Set<number>(policy.contract_reminder_days || [7])];
+      for (const days of offsets) {
+        const due = new Date(today + 'T12:00:00Z');
+        due.setUTCDate(due.getUTCDate() + days);
+        const employees = await rows(
+          c,
+          `SELECT id,name,contract_end FROM employee_profiles
+          WHERE archived_at IS NULL AND employment_state IN ('PROBATION','OFFICIAL') AND contract_end=$1`,
+          [due.toISOString().slice(0, 10)],
+        );
+        for (const e of employees)
+          for (const user of hr)
+            await notify(
+              c,
+              user.id,
+              `contract:${e.id}:${e.contract_end}:${days}`,
+              `Hợp đồng của ${e.name} hết hạn sau ${days} ngày (${e.contract_end}). HR kiểm tra gia hạn.`,
+              e.id,
+            );
+      }
+    }
     const rules = await rows(
       c,
       'SELECT * FROM recurring_rules WHERE enabled AND $1=ANY(iso_weekdays)',

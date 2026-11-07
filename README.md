@@ -1,5 +1,6 @@
 # Super Net — web quản lý công việc nội bộ
 
+> **Bản sau duyệt QC 07/11/2026:** [Hướng dẫn thay đổi, migration và chạy Windows](docs/RELEASE-APPROVED-20261107.md). HR toàn công ty, lương/thưởng tách riêng, Ban lãnh đạo được cấp riêng, account chia sẻ theo người dùng và form theo từng loại task. Các mô tả scope cũ bên dưới được thay thế bởi bản này.
 Ứng dụng TypeScript gồm React UI, Fastify API, PostgreSQL 17, worker và kho file riêng trên máy chủ. Frontend và API cùng cổng **3002**, API tương đối `/api/v1`. Dữ liệu nghiệp vụ không dùng localStorage hay dịch vụ cloud. Giao diện và nghiệp vụ dựa trên hai tài liệu người dùng cung cấp trong `docs/reference`.
 
 Đây là bản bàn giao **để kiểm thử nội bộ**, không đồng nghĩa đã nghiệm thu trên máy Windows/LAN của công ty. Xem [báo cáo kiểm thử](docs/TESTING.md), [ma trận yêu cầu](docs/REQUIREMENTS.csv), [chính sách còn mở](docs/DECISIONS.md) và [hướng dẫn Windows](docs/WINDOWS.md).

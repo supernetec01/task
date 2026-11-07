@@ -1,6 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { api, fmt } from './api';
-import { Form, Modal, Loaded, useLoad, ErrorBox, Empty, Badge, roleLabel } from './ui';
+import {
+  Form,
+  Modal,
+  Loaded,
+  useLoad,
+  ErrorBox,
+  Empty,
+  Badge,
+  roleLabel,
+  useHourlyRefresh,
+} from './ui';
 export function useDebounced<T>(value: T, delay = 300) {
   const [out, setOut] = useState(value);
   useEffect(() => {
@@ -128,7 +138,9 @@ export function ViewerPicker({
   return (
     <fieldset className="viewer-picker">
       <legend>Người được xem · {value.length} người</legend>
-      <p className="muted">Để trống: chỉ Admin. Quyền được gắn với chuyên môn còn hiệu lực.</p>
+      <p className="muted">
+        Để trống: chỉ Admin. Chọn từng người; quyền xem không phụ thuộc chuyên môn.
+      </p>
       <input
         aria-label="Tìm người được xem"
         placeholder="Tìm tên hoặc mã nhân sự…"
@@ -143,7 +155,7 @@ export function ViewerPicker({
               <label className="check">
                 <input
                   type="checkbox"
-                  disabled={!jobs.length && !value.includes(u.id)}
+                  disabled={false}
                   checked={value.includes(u.id)}
                   onChange={(e) => {
                     const ids = e.target.checked
@@ -163,27 +175,6 @@ export function ViewerPicker({
                   </small>
                 </span>
               </label>
-              {value.includes(u.id) && jobs.length > 1 && (
-                <div className="viewer-role-options">
-                  {jobs.map((role) => (
-                    <label className="check" key={role}>
-                      <input
-                        type="checkbox"
-                        checked={(roles[u.id] || []).includes(role)}
-                        onChange={(e) =>
-                          onChange(value, {
-                            ...roles,
-                            [u.id]: e.target.checked
-                              ? [...(roles[u.id] || []), role]
-                              : (roles[u.id] || []).filter((r) => r !== role),
-                          })
-                        }
-                      />
-                      {roleLabel[role]}
-                    </label>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
@@ -286,18 +277,17 @@ export function Accounts({ me }: { me: any }) {
     [cursor, setCursor] = useState('0'),
     [selected, setSelected] = useState<any>(),
     [mode, setMode] = useState(''),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState(''),
+    [viewerFilter, setViewerFilter] = useState(''),
+    [platformShare, setPlatformShare] = useState(false);
   const query = useDebounced(search),
     catalog = useLoad('/platforms', rev),
     users = useLoad(me.admin ? '/users' : null),
     list = useLoad(
-      `/platform-accounts?search=${encodeURIComponent(query)}&platform_id=${platform}&sort=${sort}&cursor=${cursor}`,
+      `/platform-accounts?search=${encodeURIComponent(query)}&platform_id=${platform}&sort=${sort}&cursor=${cursor}&viewer_id=${viewerFilter}`,
       rev,
     );
-  useEffect(() => {
-    const timer = setInterval(() => setRev((r) => r + 1), 15000);
-    return () => clearInterval(timer);
-  }, []);
+  useHourlyRefresh(() => setRev((r) => r + 1));
   useEffect(() => {
     const changed = () => {
       setMode('');
@@ -333,7 +323,7 @@ export function Accounts({ me }: { me: any }) {
           {notice}
         </div>
       )}
-      <div className="toolbar">
+      <div className="toolbar account-toolbar">
         <input
           className="search"
           aria-label="Tìm tài khoản nền tảng"
@@ -368,9 +358,32 @@ export function Accounts({ me }: { me: any }) {
           <option value="name">Tên A–Z</option>
           <option value="platform">Nền tảng</option>
         </select>
+        <button onClick={() => setRev((r) => r + 1)}>Tải lại danh sách</button>
+        {me.admin && (
+          <>
+            <select
+              aria-label="Lọc tài khoản theo người được xem"
+              value={viewerFilter}
+              onChange={(e) => {
+                setViewerFilter(e.target.value);
+                setCursor('0');
+              }}
+            >
+              <option value="">Tất cả người xem</option>
+              {users.data?.items
+                .filter((u: any) => u.active)
+                .map((u: any) => (
+                  <option value={u.id} key={u.id}>
+                    {u.name} · {u.username}
+                  </option>
+                ))}
+            </select>
+            <button onClick={() => setPlatformShare(true)}>Chia sẻ theo nền tảng</button>
+          </>
+        )}
       </div>
       <Loaded data={list.data} error={list.error}>
-        <div className="panel tablewrap">
+        <div className="panel tablewrap account-list">
           <table>
             <thead>
               <tr>
@@ -465,6 +478,19 @@ export function Accounts({ me }: { me: any }) {
           )}
         </div>
       </Loaded>
+      {platformShare && (
+        <Modal compact title="Chia sẻ theo nền tảng" onClose={() => setPlatformShare(false)}>
+          <PlatformSharing
+            platforms={catalog.data?.items || []}
+            people={users.data?.items || []}
+            onSaved={() => {
+              setPlatformShare(false);
+              setNotice('Đã lưu quyền xem nền tảng.');
+              setRev((r) => r + 1);
+            }}
+          />
+        </Modal>
+      )}
       {mode && (
         <Modal
           compact
@@ -534,12 +560,7 @@ function AccountEditor({
 }: any) {
   const usable = (selected?.viewers || []).filter((g: any) => {
     const person = people.find((u: any) => u.id === g.user_id && u.active);
-    return (
-      !g.revoked_at &&
-      (!g.valid_to || Date.parse(g.valid_to) > Date.now()) &&
-      person &&
-      activeJobRoles(person).includes(g.role)
-    );
+    return !g.revoked_at && (!g.valid_to || Date.parse(g.valid_to) > Date.now()) && person && true;
   });
   const ids = [...new Set<string>(usable.map((g: any) => g.user_id))];
   const [viewers, setViewers] = useState<string[]>(ids),
@@ -548,9 +569,17 @@ function AccountEditor({
         ids.map((id) => [id, usable.filter((g: any) => g.user_id === id).map((g: any) => g.role)]),
       ),
     ),
-    [addPlatform, setAddPlatform] = useState(false);
+    [addPlatform, setAddPlatform] = useState(false),
+    [inherit, setInherit] = useState(mode === 'create' || !!selected?.inherit_platform_viewers);
   return (
     <>
+      {mode === 'viewers' && (
+        <p className="notice">
+          Danh sách này là quyền riêng của tài khoản. Bỏ chọn một người sẽ chặn người đó ở tài khoản
+          này, kể cả đang được xem cả nền tảng. Tài khoản mới kế thừa danh sách nền tảng nếu không
+          có lựa chọn riêng.
+        </p>
+      )}
       <Form
         fields={
           mode === 'viewers'
@@ -583,8 +612,6 @@ function AccountEditor({
         }
         initial={selected ? { ...selected, platform_id: selected.platform.id } : { note: '' }}
         onSubmit={async (v, key) => {
-          if (mode !== 'edit' && viewers.some((id) => !roles[id]?.length))
-            throw Error('Chọn chuyên môn áp dụng cho người được xem.');
           await api(
             mode === 'create'
               ? '/platform-accounts'
@@ -593,12 +620,12 @@ function AccountEditor({
                 : '/platform-accounts/' + selected.id + '/viewers',
             {
               ...v,
-              viewer_ids: viewers,
+              ...(inherit ? {} : { viewer_ids: viewers }),
               viewer_roles: roles,
               expected_version: selected?.version,
               expected_sharing_version: selected?.sharing_version,
             },
-            mode === 'create' ? 'POST' : mode === 'edit' ? 'PATCH' : 'PUT',
+            mode === 'create' ? 'POST' : mode === 'edit' ? 'PATCH' : inherit ? 'DELETE' : 'PUT',
             key,
           );
           onSaved();
@@ -612,6 +639,16 @@ function AccountEditor({
           </button>
         )}
         {mode !== 'edit' && (
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={inherit}
+              onChange={(e) => setInherit(e.target.checked)}
+            />
+            Dùng người xem của nền tảng (gồm tài khoản tạo mới)
+          </label>
+        )}
+        {mode !== 'edit' && !inherit && (
           <ViewerPicker
             people={people}
             value={viewers}
@@ -815,14 +852,21 @@ export function EmployeeChecklistSettings() {
     <div className="panel">
       <h2>Nhân sự & thông báo</h2>
       <p className="muted">
-        Checklist theo loại hình chỉ áp dụng sau khi lưu quyết định. Không tự bật nhắc hết thử
-        việc/hợp đồng; ngưỡng ngày còn chờ chốt.
+        Nhắc hợp đồng trước 7 ngày, chỉ HR nhận. Checklist áp dụng theo loại hình sau khi lưu.
       </p>
       <Loaded data={data} error={error}>
         {policy && (
           <Form
             key={policy.version}
+            initial={{
+              contract_reminders_enabled: policy.value.contract_reminders_enabled ?? true,
+            }}
             fields={[
+              {
+                key: 'contract_reminders_enabled',
+                label: 'Nhắc hợp đồng trước 7 ngày cho HR',
+                type: 'checkbox',
+              },
               {
                 key: 'reason',
                 label: 'Quyết định checklist / người chốt',
@@ -834,7 +878,12 @@ export function EmployeeChecklistSettings() {
               await api(
                 '/settings/policies',
                 {
-                  value: { ...policy.value, employee_document_checklists: current },
+                  value: {
+                    ...policy.value,
+                    employee_document_checklists: current,
+                    contract_reminders_enabled: !!v.contract_reminders_enabled,
+                    contract_reminder_days: [7],
+                  },
                   expected_version: policy.version,
                   reason: v.reason,
                 },
@@ -874,5 +923,58 @@ export function EmployeeChecklistSettings() {
         )}
       </Loaded>
     </div>
+  );
+}
+
+function PlatformSharing({ platforms, people, onSaved }: any) {
+  const [id, setId] = useState(platforms[0]?.id || '');
+  const share = useLoad(id ? '/platforms/' + id + '/viewers' : null);
+  return (
+    <>
+      <p className="notice">
+        Người được chọn xem các tài khoản hiện tại và tài khoản tạo mới của nền tảng. Quyền riêng
+        từng tài khoản được ưu tiên nếu đã thiết lập.
+      </p>
+      <label>
+        Nền tảng
+        <select aria-label="Nền tảng chia sẻ" value={id} onChange={(e) => setId(e.target.value)}>
+          {platforms.map((p: any) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Loaded {...share}>
+        {share.data && (
+          <PlatformViewerForm
+            key={id + ':' + share.data.sharing_version}
+            data={share.data}
+            people={people}
+            onSaved={onSaved}
+          />
+        )}
+      </Loaded>
+    </>
+  );
+}
+function PlatformViewerForm({ data, people, onSaved }: any) {
+  const [ids, setIds] = useState<string[]>(data.items.map((u: any) => u.user_id));
+  return (
+    <Form
+      fields={[]}
+      onSubmit={async (v, key) => {
+        await api(
+          '/platforms/' + data.id + '/viewers',
+          { viewer_ids: ids, expected_sharing_version: data.sharing_version },
+          'PUT',
+          key,
+        );
+        onSaved();
+      }}
+      label="Lưu người xem nền tảng"
+    >
+      <ViewerPicker people={people} value={ids} roles={{}} onChange={setIds} />
+    </Form>
   );
 }

@@ -1,6 +1,18 @@
 import React, { useState } from 'react';
 import { api } from './api';
-import { Form, Modal, Loaded, useLoad, Empty, options, Badge, type Field } from './ui';
+import {
+  Form,
+  useHourlyRefresh,
+  Modal,
+  Loaded,
+  useLoad,
+  ErrorBox,
+  Empty,
+  options,
+  Badge,
+  type Field,
+  businessLabels,
+} from './ui';
 export function Metrics({ kind }: { kind: string }) {
   const [rev, setRev] = useState(0),
     { data, error } = useLoad('/metrics?kind=' + kind, rev),
@@ -10,12 +22,23 @@ export function Metrics({ kind }: { kind: string }) {
     [batch, setBatch] = useState<any>(),
     [preview, setPreview] = useState<any>(),
     [sheet, setSheet] = useState(''),
+    [headerRow, setHeaderRow] = useState(1),
     [err, setErr] = useState<any>();
+  const columns = (
+    batch?.raw.find((s: any) => s.name === (sheet || batch.raw[0]?.name))?.rows[headerRow - 1] || []
+  ).map((name: any, index: number) => ({
+    value: String(index),
+    label: `${String.fromCharCode(65 + index)} · ${String(name || 'Không có tiêu đề')}`,
+  }));
   const refresh = () => setRev((r) => r + 1);
+  useHourlyRefresh(refresh);
   return (
     <>
       <div className="toolbar">
-        <p className="muted">Nguồn {kind} · Dữ liệu đã xác nhận, không suy từ số task.</p>
+        <button onClick={refresh}>Tải lại danh sách</button>
+        <p className="muted">
+          Nguồn {businessLabels[kind] || kind} · Dữ liệu đã xác nhận, không suy từ số task.
+        </p>
         <button onClick={() => setManual(true)}>+ Nhập số liệu có nguồn</button>
         <button className="primary" onClick={() => setUpload(true)}>
           Nhập file XLSX / CSV
@@ -30,7 +53,7 @@ export function Metrics({ kind }: { kind: string }) {
               <thead>
                 <tr>
                   <th>Shop / đối tượng</th>
-                  <th>Kỳ / grain</th>
+                  <th>Kỳ / phạm vi</th>
                   <th>Chỉ số</th>
                   <th>Giá trị</th>
                   <th>Nguồn / revision</th>
@@ -46,10 +69,11 @@ export function Metrics({ kind }: { kind: string }) {
                     <td>
                       {String(r.business_date).slice(0, 10)} – {String(r.window_end).slice(0, 10)}
                       <div className="row-meta">
-                        {r.grain} · {r.aggregation}
+                        {businessLabels[r.grain] || r.grain} ·{' '}
+                        {businessLabels[r.aggregation] || r.aggregation}
                       </div>
                     </td>
-                    <td>{r.metric}</td>
+                    <td>{businessLabels[r.metric] || r.metric}</td>
                     <td>
                       {r.value === null ? 'N/A · ' + r.missing_reason : r.value}
                       <div className="row-meta">{r.currency}</div>
@@ -70,6 +94,10 @@ export function Metrics({ kind }: { kind: string }) {
       </Loaded>
       <div className="panel">
         <h2>Nguồn nhập</h2>
+        <ErrorBox error={batches.error} />
+        {batches.error && (
+          <button onClick={() => setRev((r) => r + 1)}>Thử tải lại nguồn nhập</button>
+        )}
         {batches.data?.items.map((b: any) => (
           <div key={b.id} className="support-row">
             <button
@@ -78,6 +106,7 @@ export function Metrics({ kind }: { kind: string }) {
                 setBatch(await api('/imports/' + b.id));
                 setPreview(null);
                 setSheet('');
+                setHeaderRow(1);
               }}
             >
               {b.filename}
@@ -121,7 +150,7 @@ export function Metrics({ kind }: { kind: string }) {
             <>
               <h3>2–3 · Chọn sheet và cột nguồn</h3>
               <Form
-                key={batch.id + sheet}
+                key={batch.id}
                 fields={[
                   {
                     key: 'sheet',
@@ -138,8 +167,9 @@ export function Metrics({ kind }: { kind: string }) {
                   },
                   {
                     key: 'date_column',
-                    label: 'Cột ngày (A=0, B=1, …)',
-                    type: 'number',
+                    label: 'Cột ngày',
+                    type: 'select',
+                    options: columns,
                     required: true,
                   },
                   {
@@ -177,7 +207,13 @@ export function Metrics({ kind }: { kind: string }) {
                         required: true,
                         options: options(Object.keys(data?.definitions || {})),
                       },
-                      { key: 'column', label: 'Vị trí cột (A=0)', type: 'number', required: true },
+                      {
+                        key: 'column',
+                        label: 'Cột nguồn',
+                        type: 'select',
+                        options: columns,
+                        required: true,
+                      },
                     ],
                   },
                 ]}
@@ -195,9 +231,10 @@ export function Metrics({ kind }: { kind: string }) {
                     '/imports/' + batch.id + '/preview',
                     {
                       ...v,
+                      date_column: Number(v.date_column),
                       window_end: v.window_end || undefined,
                       mapping: Object.fromEntries(
-                        (v.mapping || []).map((m: any) => [m.metric, m.column]),
+                        (v.mapping || []).map((m: any) => [m.metric, Number(m.column)]),
                       ),
                       expected_version: batch.version,
                     },
@@ -206,6 +243,10 @@ export function Metrics({ kind }: { kind: string }) {
                   );
                   setPreview(r);
                   setBatch({ ...batch, version: r.version });
+                }}
+                onChange={(v) => {
+                  setSheet(v.sheet || '');
+                  setHeaderRow(v.header_row || 1);
                 }}
                 label="Tạo preview kiểm tra"
               />
@@ -403,14 +444,17 @@ function ImportUpload({ kind, onDone }: { kind: string; onDone: (id: string) => 
 export function Claims() {
   const [rev, setRev] = useState(0),
     { data, error } = useLoad('/claims', rev);
+  useHourlyRefresh(() => setRev((r) => r + 1));
   return (
     <div className="split">
       <div className="panel">
         <h2>Bồi hoàn đã nhập</h2>
+        <button onClick={() => setRev((r) => r + 1)}>Tải lại danh sách</button>
         <Loaded data={data} error={error}>
           {data?.items.map((r: any) => (
             <div key={r.id} className="support-row">
-              <strong>{r.order_id}</strong> · {r.amount} {r.currency} <Badge>{r.stage}</Badge>
+              <strong>{r.order_id}</strong> · {r.amount} {r.currency}{' '}
+              <Badge>{businessLabels[r.stage] || r.stage}</Badge>
               <p>{r.lines.map((l: any) => l.sku).join(', ')}</p>
             </div>
           ))}

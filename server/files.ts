@@ -16,7 +16,8 @@ import {
   manages,
   management,
 } from './base.js';
-import { hrAccess, sensitiveAllowed } from './employees.js';
+import { employeeRevision } from './employee-history.js';
+import { hrAccess, sensitiveAllowed, payrollAllowed } from './employees.js';
 import { taskAccess } from './tasks.js';
 export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
   const r = await one(
@@ -110,7 +111,8 @@ export function fileRoutes(api: API) {
         422,
         'SENSITIVE_CLASSIFICATION',
       );
-      if (v.classification === 'SENSITIVE') need(await sensitiveAllowed(c, a, e));
+      if (v.classification === 'SENSITIVE')
+        need(v.document_kind === 'PAYROLL' ? payrollAllowed(a) : await sensitiveAllowed(c, a, e));
       role = 'HR';
     } else if (v.task_id) {
       const x = await taskAccess(c, a, v.task_id, true);
@@ -167,6 +169,20 @@ export function fileRoutes(api: API) {
         'INSERT INTO employee_documents(employee_id,asset_id,document_kind,classification) VALUES($1,$2,$3,$4)',
         [v.employee_id, id, v.document_kind, v.classification],
       );
+    if (v.employee_id)
+      await employeeRevision(
+        c,
+        a,
+        v.employee_id,
+        'DOCUMENT_UPLOADED',
+        null,
+        { asset_id: id, document_kind: v.document_kind, classification: v.classification },
+        v.classification === 'BASIC'
+          ? 'BASIC'
+          : v.document_kind === 'PAYROLL'
+            ? 'PAYROLL'
+            : 'SENSITIVE',
+      );
     await audit(c, a, 'FILE_UPLOADED', 'asset', id);
     return f;
   });
@@ -177,11 +193,12 @@ export function fileRoutes(api: API) {
       const e = await hrAccess(c, a, f.employee_id);
       const doc = await one(
         c,
-        'SELECT classification FROM employee_documents WHERE asset_id=$1 AND employee_id=$2',
+        'SELECT classification,document_kind FROM employee_documents WHERE asset_id=$1 AND employee_id=$2',
         [f.id, e.id],
       );
       need(doc, 'Không tìm thấy tệp', 404, 'NOT_FOUND');
-      if (doc.classification === 'SENSITIVE') need(await sensitiveAllowed(c, a, e));
+      if (doc.classification === 'SENSITIVE')
+        need(doc.document_kind === 'PAYROLL' ? payrollAllowed(a) : await sensitiveAllowed(c, a, e));
     } else if (f.task_id) {
       const x = await taskAccess(c, a, f.task_id);
       need(x.owner || x.manager || (f.shared && x.support), 'Không tìm thấy tệp', 404, 'NOT_FOUND');

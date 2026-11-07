@@ -21,6 +21,7 @@ import {
   type DB,
   audit,
   isAdmin,
+  hasJob,
   jobs,
   access,
   version,
@@ -68,6 +69,11 @@ export async function buildApp() {
   });
   await app.register(cookie);
   await app.register(rateLimit, { max: 500, timeWindow: '1 minute' });
+  const loginIpLimit = app.createRateLimit({
+    max: 100,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => 'login-ip:' + req.ip,
+  });
   await app.register(multipart, {
     limits: {
       fileSize: Number(process.env.MAX_UPLOAD_MB || 25) * 1024 * 1024,
@@ -116,33 +122,83 @@ export async function buildApp() {
           ? e.code
           : e instanceof ZodError
             ? 'VALIDATION'
-            : status === 409
-              ? 'CONFLICT'
-              : status === 429
-                ? 'RATE_LIMIT'
-                : status >= 500
-                  ? 'INTERNAL_ERROR'
-                  : 'REQUEST_ERROR',
+            : e.constraint === 'employee_code_unique'
+              ? 'EMPLOYEE_CODE_EXISTS'
+              : status === 409
+                ? 'CONFLICT'
+                : status === 429
+                  ? 'RATE_LIMIT'
+                  : status >= 500
+                    ? 'INTERNAL_ERROR'
+                    : 'REQUEST_ERROR',
       message:
         e instanceof Fault
           ? e.message
           : e instanceof ZodError
             ? 'Dữ liệu không hợp lệ'
-            : status === 409
-              ? 'Dữ liệu đã tồn tại hoặc vừa thay đổi'
-              : status === 429
-                ? 'Bạn đã thử quá nhiều lần. Vui lòng chờ một phút rồi thử lại.'
-                : status >= 500
-                  ? 'Không thể lưu. Vui lòng thử lại; nội dung chưa được xác nhận.'
-                  : 'Yêu cầu không hợp lệ',
-      field_errors: e instanceof ZodError ? e.issues : undefined,
+            : e.constraint === 'employee_code_unique'
+              ? 'Mã nhân sự này đã tồn tại. Hãy chọn mã khác hoặc mở hồ sơ đã có.'
+              : status === 409
+                ? 'Dữ liệu đã tồn tại hoặc vừa thay đổi'
+                : status === 429
+                  ? 'Bạn đã thử quá nhiều lần. Vui lòng chờ một phút rồi thử lại.'
+                  : status >= 500
+                    ? 'Không thể lưu. Vui lòng thử lại; nội dung chưa được xác nhận.'
+                    : 'Yêu cầu không hợp lệ',
+      field_errors:
+        e instanceof ZodError
+          ? e.issues.map((issue: any) => ({
+              path: issue.path,
+              message: /[À-ỹ]/.test(issue.message)
+                ? issue.message
+                : issue.code === 'too_small'
+                  ? `Cần nhập ít nhất ${issue.minimum} ${issue.origin === 'array' ? 'mục' : 'ký tự'}`
+                  : issue.code === 'too_big'
+                    ? `Vượt giới hạn ${issue.maximum}`
+                    : issue.format === 'email'
+                      ? 'Email không đúng định dạng'
+                      : issue.format === 'date' || issue.format === 'datetime'
+                        ? 'Ngày hoặc thời gian không hợp lệ'
+                        : 'Giá trị chưa đúng định dạng. Kiểm tra hướng dẫn của trường này.',
+            }))
+          : e instanceof Fault
+            ? e.fields
+            : undefined,
       request_id: req.id,
       retryable: status >= 500 || status === 429,
     });
   });
   app.post(
     '/api/v1/auth/login',
-    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    {
+      onRequest: async (req) => {
+        const limit = await loginIpLimit(req);
+        need(
+          limit.isAllowed || !limit.isExceeded,
+          'Bạn đã thử quá nhiều lần. Vui lòng chờ một phút rồi thử lại.',
+          429,
+          'RATE_LIMIT',
+        );
+      },
+      config: {
+        rateLimit: {
+          max: 10,
+          timeWindow: '1 minute',
+          hook: 'preHandler',
+          groupId: 'login-account',
+          keyGenerator: (req) => {
+            const input = req.body as any;
+            const name =
+              typeof input?.username === 'string'
+                ? input.username
+                : typeof input?.email === 'string'
+                  ? input.email
+                  : '';
+            return req.ip + ':' + hash(name.trim().toLowerCase().slice(0, 254));
+          },
+        },
+      },
+    },
     async (req, reply) => {
       const b = z
         .object({
@@ -244,6 +300,16 @@ export async function buildApp() {
               JSON.stringify([
                 a.permission_version,
                 [...a.grants].sort((x, y) => x.id.localeCompare(y.id)),
+                await rows(
+                  c,
+                  'SELECT account_id,allowed,valid_to FROM account_viewer_overrides WHERE user_id=$1 ORDER BY account_id',
+                  [a.id],
+                ),
+                await rows(
+                  c,
+                  'SELECT platform_id FROM platform_viewers WHERE user_id=$1 ORDER BY platform_id',
+                  [a.id],
+                ),
                 await rows(
                   c,
                   'SELECT id,account_id,role,valid_to FROM account_grants WHERE user_id=$1 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now()) ORDER BY id',
@@ -491,6 +557,12 @@ export async function buildApp() {
               reopen_enabled: z.boolean().default(false),
               employee_leave_confirmed: z.boolean().default(false),
               recruiter_reminders_confirmed: z.boolean().default(false),
+              contract_reminders_enabled: z.boolean().default(true),
+              contract_reminder_days: z
+                .array(z.number().int().min(0).max(365))
+                .min(1)
+                .max(12)
+                .default([7]),
               employee_document_checklists: z
                 .partialRecord(
                   z.enum(['FULL_TIME', 'PART_TIME', 'INTERN', 'CONTRACTOR']),
@@ -520,8 +592,8 @@ export async function buildApp() {
   api('GET', '/notifications', async (c, a) => ({
     items: await rows(
       c,
-      'SELECT * FROM notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT 100',
-      [a.id],
+      "SELECT * FROM notifications WHERE user_id=$1 AND ($2 OR event_key NOT LIKE 'contract:%') ORDER BY created_at DESC LIMIT 100",
+      [a.id, hasJob(a, 'HR')],
     ),
   }));
   api('POST', '/notifications/:id/read', async (c, a, b, q, p) => {

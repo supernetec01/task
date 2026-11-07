@@ -407,25 +407,32 @@ const nestedLabels: Record<string, string> = {
   unit: 'Đơn vị',
   readiness: 'Mức độ sẵn sàng',
 };
-function specializedFields(template: any): Field[] {
+function specializedFields(template: any, people: any[] = []): Field[] {
   return template.fields.map((f: any) => ({
     key: 'payload_' + f.key,
     label: f.label,
-    type: ['array', 'metric_array'].includes(f.type)
-      ? 'array'
-      : f.type === 'boolean'
-        ? 'checkbox'
-        : f.type === 'datetime'
-          ? 'datetime-local'
-          : f.type === 'decimal'
-            ? 'number'
-            : ['reference_array', 'link_array'].includes(f.type)
-              ? 'textarea'
-              : f.type === 'string'
-                ? 'textarea'
-                : f.type === 'reference'
-                  ? 'text'
-                  : f.type,
+    section: f.section,
+    hint: f.required_at_action ? 'Bắt buộc khi nộp kết quả; có thể lưu dở.' : undefined,
+    options:
+      f.type === 'user_array' ? people.map((u) => ({ value: u.id, label: u.name })) : undefined,
+    type:
+      f.type === 'user_array'
+        ? 'multi-select'
+        : ['array', 'metric_array'].includes(f.type)
+          ? 'array'
+          : f.type === 'boolean'
+            ? 'checkbox'
+            : f.type === 'datetime'
+              ? 'datetime-local'
+              : f.type === 'decimal'
+                ? 'number'
+                : ['reference_array', 'link_array'].includes(f.type)
+                  ? 'textarea'
+                  : f.type === 'string'
+                    ? 'textarea'
+                    : f.type === 'reference'
+                      ? 'text'
+                      : f.type,
     fields: f.items
       ? Object.entries(f.items).map(([key, type]: any) => ({
           key,
@@ -459,6 +466,8 @@ function workInitial(t: any) {
         ? localInput(v)
         : v;
   }
+  if (t.template_snapshot.workflow?.length)
+    value.payload_workflow_step = t.payload.workflow_step || t.template_snapshot.workflow[0].key;
   return value;
 }
 function specializedPayload(t: any, v: any) {
@@ -474,6 +483,9 @@ function specializedPayload(t: any, v: any) {
         ? iso(value)
         : value;
   }
+  if (t.template_snapshot.workflow?.length)
+    values.workflow_step =
+      v.payload_workflow_step || t.payload.workflow_step || t.template_snapshot.workflow[0].key;
   return values;
 }
 
@@ -488,6 +500,7 @@ export function TaskDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
+  const formPeople = useLoad('/directory/invitees');
   const [revision, setRevision] = useState(0),
     { data: t, error } = useLoad('/tasks/' + id, revision),
     [tab, setTab] = useState('info'),
@@ -859,14 +872,59 @@ export function TaskDetail({
                   >
                     {canWork && (
                       <div className="drawer-section">
-                        <h3>Cập nhật công việc</h3>
+                        <h3>{t.template_name}</h3>
+                        {t.template_snapshot.workflow?.length && (
+                          <ol className="workflow-steps">
+                            {t.template_snapshot.workflow.map((step: any) => (
+                              <li
+                                key={step.key}
+                                className={
+                                  (workingDraft?.payload_workflow_step ||
+                                    t.payload.workflow_step ||
+                                    t.template_snapshot.workflow[0].key) === step.key
+                                    ? 'active'
+                                    : ''
+                                }
+                              >
+                                {step.label}
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                        {t.template_snapshot.output_policy === 'FILE_REQUIRED' && (
+                          <p className="notice">
+                            Kết quả cần file tài liệu phân tích. Tải file rồi chọn trong phần Tệp
+                            dùng làm kết quả.
+                          </p>
+                        )}
                         <Form
                           key={'work-' + revision}
                           initial={workingDraft || workInitial(t)}
                           extraFields={
-                            t.type === 'OTHER' ? [] : specializedFields(t.template_snapshot)
+                            t.type === 'OTHER'
+                              ? []
+                              : [
+                                  ...(t.template_snapshot.workflow?.length
+                                    ? [
+                                        {
+                                          key: 'payload_workflow_step',
+                                          label: 'Bước sản xuất hiện tại',
+                                          type: 'select',
+                                          options: t.template_snapshot.workflow.map(
+                                            (step: any) => ({ value: step.key, label: step.label }),
+                                          ),
+                                          hint: 'Chuyển lần lượt từng bước; bổ sung đủ thông tin bước trước khi chuyển.',
+                                        },
+                                      ]
+                                    : []),
+                                  ...specializedFields(
+                                    t.template_snapshot,
+                                    formPeople.data?.items || [],
+                                  ),
+                                ]
                           }
-                          extraTitle={'Thông tin chuyên môn · ' + t.template_name}
+                          specializedInline
+                          extraTitle={'Biểu mẫu · ' + t.template_name}
                           onChange={(v) => setWorkingDraft(v)}
                           fields={[
                             {

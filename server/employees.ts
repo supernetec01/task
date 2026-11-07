@@ -16,32 +16,26 @@ import {
   localDate,
   jobs,
   setting,
+  isExecutive,
+  decipher,
 } from './base.js';
+import { employeeRevision, basicSnapshot } from './employee-history.js';
+export const hrEdit = (a: Actor) => isAdmin(a) || hasJob(a, 'HR');
+export const payrollAllowed = (a: Actor) => hrEdit(a) || isExecutive(a);
 export async function hrAccess(c: DB, a: Actor, id: string, lock = false) {
-  need(isAdmin(a) || hasJob(a, 'HR'));
+  need(hrEdit(a) || isExecutive(a));
+  if (lock)
+    need(hrEdit(a), 'Ban lãnh đạo có quyền xem; chỉnh sửa hồ sơ cơ bản dành cho Admin và HR');
   const e = await one(
     c,
     'SELECT * FROM employee_profiles WHERE id=$1' + (lock ? ' FOR UPDATE' : ''),
     [id],
   );
   need(e, 'Không tìm thấy nhân viên', 404, 'NOT_FOUND');
-  if (!isAdmin(a) && e.created_by !== a.id) {
-    const owner = await one(c, 'SELECT id,team_id FROM users WHERE id=$1', [e.created_by]);
-    need(manages(a, owner), 'Không tìm thấy nhân viên', 404, 'NOT_FOUND');
-  }
   return e;
 }
 export async function sensitiveAllowed(c: DB, a: Actor, e: any) {
-  if (isAdmin(a)) return true;
-  const u = e.user_id ? await one(c, 'SELECT team_id FROM users WHERE id=$1', [e.user_id]) : null;
-  return a.grants.some(
-    (g) =>
-      g.kind === 'ACCESS' &&
-      g.role === 'HR_SENSITIVE' &&
-      (g.scope === 'ALL' ||
-        (g.scope === 'SELF' && e.user_id === a.id) ||
-        (g.scope === 'TEAM' && u?.team_id === g.team_id)),
-  );
+  return isAdmin(a) || isExecutive(a);
 }
 const nullableDate = z.iso.date().nullable().default(null);
 const contact = z
@@ -85,9 +79,17 @@ async function details(c: DB, a: Actor, e: any) {
   const sensitive = await sensitiveAllowed(c, a, e);
   const documents = await rows(
     c,
-    `SELECT d.id,d.asset_id,d.document_kind,d.classification,d.created_at,f.filename,f.size FROM employee_documents d JOIN assets f ON f.id=d.asset_id WHERE d.employee_id=$1 AND ($2 OR d.classification='BASIC') ORDER BY d.created_at DESC`,
-    [e.id, sensitive],
+    `SELECT d.id,d.asset_id,d.document_kind,d.classification,d.created_at,f.filename,f.size FROM employee_documents d JOIN assets f ON f.id=d.asset_id WHERE d.employee_id=$1 AND ($2 OR d.classification='BASIC' OR ($3 AND d.document_kind='PAYROLL')) ORDER BY d.created_at DESC`,
+    [e.id, sensitive, payrollAllowed(a)],
   );
+  const present = await rows(
+    c,
+    'SELECT DISTINCT document_kind FROM employee_documents WHERE employee_id=$1',
+    [e.id],
+  );
+  const linked = e.user_id
+    ? await one(c, 'SELECT id,username,name,active FROM users WHERE id=$1', [e.user_id])
+    : null;
   const policies = await setting(c, 'policies');
   const checklist = Array.isArray(policies.employee_document_checklists?.[e.employment_type])
     ? policies.employee_document_checklists[e.employment_type]
@@ -97,6 +99,7 @@ async function details(c: DB, a: Actor, e: any) {
     employee_code: e.employee_code,
     name: e.name,
     user_id: e.user_id,
+    linked_user: linked,
     birthday: e.birthday,
     joined_on: e.joined_on,
     team_id: e.team_id,
@@ -115,13 +118,15 @@ async function details(c: DB, a: Actor, e: any) {
     positions,
     documents,
     missing_documents: checklist.filter(
-      (kind: string) => !documents.some((d) => d.document_kind === kind),
+      (kind: string) => !present.some((d) => d.document_kind === kind),
     ),
     checklist_configured: checklist.length > 0,
     capabilities: {
-      edit: !e.archived_at,
+      edit: hrEdit(a) && !e.archived_at,
+      payroll: payrollAllowed(a),
+      provision_user: isAdmin(a) && !e.archived_at && !e.user_id,
       sensitive,
-      leave: !e.archived_at && e.employment_state !== 'CANDIDATE',
+      leave: hrEdit(a) && !e.archived_at && e.employment_state !== 'CANDIDATE',
     },
     events: await rows(
       c,
@@ -131,7 +136,7 @@ async function details(c: DB, a: Actor, e: any) {
   };
 }
 async function employeeList(c: DB, a: Actor, q: any) {
-  need(isAdmin(a) || hasJob(a, 'HR'));
+  need(hrEdit(a) || isExecutive(a));
   const data = await rows(
     c,
     `SELECT e.*,t.name AS team_name FROM employee_profiles e LEFT JOIN teams t ON t.id=e.team_id WHERE e.employment_state<>'CANDIDATE' AND ($1::boolean=(e.archived_at IS NOT NULL OR e.employment_state='LEFT')) AND (e.name ILIKE $2 OR coalesce(e.employee_code,'') ILIKE $2) AND ($3='' OR e.team_id::text=$3) AND ($4='' OR e.employment_state=$4) AND ($5='' OR e.employment_type=$5) AND ($6='' OR EXISTS(SELECT 1 FROM employee_positions p WHERE p.employee_id=e.id AND p.position_code=$6 AND p.effective_to IS NULL)) ORDER BY e.name,e.id`,
@@ -160,6 +165,17 @@ async function validate(c: DB, a: Actor, v: z.infer<typeof employeeSchema>, id?:
     'Vị trí không hợp lệ hoặc bị trùng',
     422,
     'VALIDATION',
+  );
+  const duplicate = await one(
+    c,
+    'SELECT id FROM employee_profiles WHERE lower(employee_code)=lower($1) AND ($2::uuid IS NULL OR id<>$2)',
+    [v.employee_code, id || null],
+  );
+  need(
+    !duplicate,
+    'Mã nhân sự này đã tồn tại. Hãy chọn mã khác hoặc mở hồ sơ đã có.',
+    409,
+    'EMPLOYEE_CODE_EXISTS',
   );
   if (v.team_id)
     need(
@@ -217,7 +233,7 @@ async function validate(c: DB, a: Actor, v: z.infer<typeof employeeSchema>, id?:
 }
 export function employeeRoutes(api: API) {
   api('GET', '/employees/options', async (c, a) => {
-    need(isAdmin(a) || hasJob(a, 'HR'));
+    need(hrEdit(a) || isExecutive(a));
     const people = await rows(c, 'SELECT id,name,team_id FROM users WHERE active ORDER BY name');
     const managers = [];
     for (const p of people) {
@@ -319,7 +335,7 @@ export function employeeRoutes(api: API) {
     return { url: '/api/v1/employees/export?' + q };
   });
   api('POST', '/employees', async (c, a, b) => {
-    need(isAdmin(a) || hasJob(a, 'HR'));
+    need(hrEdit(a));
     const v = employeeSchema.parse(b);
     await validate(c, a, v);
     need(!v.user_id || isAdmin(a), 'Chỉ Admin liên kết tài khoản đăng nhập', 403, 'FORBIDDEN');
@@ -363,6 +379,7 @@ export function employeeRoutes(api: API) {
         }),
       ],
     );
+    await employeeRevision(c, a, e.id, 'PROFILE_CREATED', null, basicSnapshot(e, v.positions));
     return details(c, a, e);
   });
   api('GET', '/employees/:id', async (c, a, b, q, p) => details(c, a, await hrAccess(c, a, p.id)));
@@ -432,6 +449,17 @@ export function employeeRoutes(api: API) {
         }),
       ],
     );
+    await employeeRevision(
+      c,
+      a,
+      e.id,
+      'PROFILE_UPDATED',
+      basicSnapshot(
+        e,
+        old.map((p) => p.position_code),
+      ),
+      basicSnapshot(updated, v.positions),
+    );
     return details(c, a, updated);
   });
   api('PUT', '/employees/:id/photo', async (c, a, b, q, p) => {
@@ -456,7 +484,9 @@ export function employeeRoutes(api: API) {
       "UPDATE employee_profiles SET contact=jsonb_set(contact,'{photo_asset_id}',$2::jsonb),version=version+1 WHERE id=$1",
       [e.id, JSON.stringify(id)],
     );
-    return details(c, a, await hrAccess(c, a, e.id));
+    const updated = await hrAccess(c, a, e.id);
+    await employeeRevision(c, a, e.id, 'PHOTO_UPDATED', basicSnapshot(e), basicSnapshot(updated));
+    return details(c, a, updated);
   });
   api('POST', '/employees/:id/leave', async (c, a, b, q, p) => {
     const e = await hrAccess(c, a, p.id, true);
@@ -522,7 +552,47 @@ export function employeeRoutes(api: API) {
       "INSERT INTO employment_events(employee_id,kind,business_date,actor_id,payload) VALUES($1,'LEFT',$2,$3,$4)",
       [e.id, v.left_on, a.id, JSON.stringify({ reason: v.reason })],
     );
+    if (e.user_id) {
+      await c.query('DELETE FROM platform_viewers WHERE user_id=$1', [e.user_id]);
+      await c.query('UPDATE account_viewer_overrides SET allowed=false WHERE user_id=$1', [
+        e.user_id,
+      ]);
+    }
+    await employeeRevision(
+      c,
+      a,
+      e.id,
+      'LEFT',
+      basicSnapshot(e),
+      basicSnapshot(await hrAccess(c, a, e.id)),
+    );
     return { ok: true, handover_required: true };
+  });
+  api('GET', '/employees/:id/history', async (c, a, b, q, p) => {
+    const e = await hrAccess(c, a, p.id);
+    const category = z.enum(['BASIC', 'PAYROLL', 'SENSITIVE']).default('BASIC').parse(q.category);
+    if (category === 'SENSITIVE') need(await sensitiveAllowed(c, a, e));
+    if (category === 'PAYROLL') need(payrollAllowed(a));
+    const cursor = z.coerce.number().int().min(0).default(0).parse(q.cursor);
+    const records = await rows(
+      c,
+      'SELECT r.*,u.name AS actor_name FROM employee_revisions r JOIN users u ON u.id=r.actor_id WHERE employee_id=$1 AND category=$2 ORDER BY r.id DESC LIMIT 31 OFFSET $3',
+      [e.id, category, cursor],
+    );
+    return {
+      items: records.slice(0, 30).map((r) => ({
+        id: r.id,
+        action: r.action,
+        category: r.category,
+        actor_id: r.actor_id,
+        actor_name: r.actor_name,
+        created_at: r.created_at,
+        ...(category === 'BASIC'
+          ? { before: r.before_data, after: r.after_data }
+          : JSON.parse(decipher(r.encrypted_change))),
+      })),
+      next_cursor: records.length > 30 ? String(cursor + 30) : null,
+    };
   });
   api('GET', '/employees/:id/handover', async (c, a, b, q, p) => {
     const e = await hrAccess(c, a, p.id);

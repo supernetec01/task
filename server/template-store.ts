@@ -28,6 +28,35 @@ export async function seedTemplateMigration(c: DB) {
   }
   await snapshotLegacyTasks(c);
 }
+export async function upgradeTaskForms(c: DB) {
+  const seed = JSON.parse(readFileSync('config/task_templates.json', 'utf8')).templates;
+  for (const definition of seed) {
+    if (definition.roles.every((r: string) => r === 'WAREHOUSE')) continue;
+    const old = await one(
+      c,
+      'SELECT t.current_version,v.created_by,v.definition FROM task_templates t JOIN task_template_versions v ON v.code=t.code AND v.version=t.current_version WHERE t.code=$1 FOR UPDATE OF t',
+      [definition.code],
+    );
+    // Never overwrite an administrator's custom version.
+    if (
+      !old ||
+      old.created_by ||
+      old.current_version > 1 ||
+      JSON.stringify(old.definition) === JSON.stringify(definition)
+    )
+      continue;
+    const version = old.current_version + 1;
+    await c.query('INSERT INTO task_template_versions(code,version,definition) VALUES($1,$2,$3)', [
+      definition.code,
+      version,
+      JSON.stringify({ ...definition, version }),
+    ]);
+    await c.query('UPDATE task_templates SET current_version=$2,updated_at=now() WHERE code=$1', [
+      definition.code,
+      version,
+    ]);
+  }
+}
 export async function snapshotLegacyTasks(c: DB) {
   const seed = JSON.parse(readFileSync('config/task_templates.json', 'utf8')).templates;
   const legacy = JSON.parse(readFileSync('config/legacy_task_templates.json', 'utf8')).templates;
@@ -37,6 +66,7 @@ export async function snapshotLegacyTasks(c: DB) {
   );
   for (const t of oldTasks) {
     const old = legacy.find((v: any) => v.code === t.type);
+
     const definition = {
       ...(old || legacy.find((v: any) => v.code === 'OTHER')),
       code: t.type,
@@ -116,8 +146,10 @@ const field = z.object({
     'reference',
     'reference_array',
     'link_array',
+    'user_array',
   ]),
   phase: z.enum(['WORK', 'SUBMIT']),
+  section: z.string().max(150).optional(),
   required_at_action: z.boolean(),
   items: z.record(z.string().regex(/^[a-z][a-z0-9_]{0,63}$/), nestedType).optional(),
 });
@@ -128,7 +160,7 @@ const edit = z.object({
   roles: z.array(z.string()).min(1).max(20),
   fields: z.array(field).max(60),
   checkpoints: z.array(z.string().trim().min(1).max(150)).max(50),
-  output_policy: z.enum(['TEXT_OR_ARTIFACT', 'ARTIFACT_REQUIRED']),
+  output_policy: z.enum(['TEXT_OR_ARTIFACT', 'ARTIFACT_REQUIRED', 'FILE_REQUIRED']),
   ready_gate_enabled: z.boolean().default(false),
   reason: z.string().trim().min(1).max(1000),
 });
@@ -192,6 +224,15 @@ export function templateRoutes(api: API) {
           old.current_version,
         ])
       : null;
+    if (previous?.definition?.workflow)
+      need(
+        previous.definition.workflow.every((step: any) =>
+          step.fields.every((key: string) => v.fields.some((f) => f.key === key)),
+        ),
+        'Không xóa trường đang dùng trong quy trình video; hãy tạo mẫu mới nếu cần quy trình khác',
+        422,
+        'WORKFLOW_FIELD_REQUIRED',
+      );
     const definition = {
       ...(previous?.definition || {}),
       code,

@@ -14,6 +14,7 @@ const types: Record<string, string> = {
   reference: 'Mã liên kết',
   reference_array: 'Danh sách mã',
   link_array: 'Danh sách đường dẫn',
+  user_array: 'Chọn nhân sự tham gia',
 };
 const rowTypes = {
   string: 'Văn bản',
@@ -40,6 +41,7 @@ export function TemplateAdmin() {
       hint: 'Chữ thường, số và dấu gạch dưới; giữ nguyên khi trường đã có dữ liệu.',
     },
     { key: 'label', label: 'Nhãn hiển thị', required: true },
+    { key: 'section', label: 'Nhóm trường trên form' },
     {
       key: 'type',
       label: 'Kiểu nhập',
@@ -204,6 +206,7 @@ export function TemplateAdmin() {
                 required: true,
                 options: [
                   { value: 'TEXT_OR_ARTIFACT', label: 'Văn bản hoặc tệp / link' },
+                  { value: 'FILE_REQUIRED', label: 'File tài liệu bắt buộc' },
                   { value: 'ARTIFACT_REQUIRED', label: 'Bắt buộc có tệp / link' },
                 ],
               },

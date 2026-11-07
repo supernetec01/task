@@ -282,7 +282,11 @@ function GrantForm({ userId, teamOptions, access, onDone }: any) {
           onChange={(e) => {
             setRole(e.target.value);
             setScope(
-              e.target.value === 'ADMIN' ? 'ALL' : e.target.value === 'EMPLOYEE' ? 'SELF' : 'TEAM',
+              ['ADMIN', 'EXECUTIVE'].includes(e.target.value)
+                ? 'ALL'
+                : e.target.value === 'EMPLOYEE'
+                  ? 'SELF'
+                  : 'TEAM',
             );
           }}
         >
@@ -296,7 +300,7 @@ function GrantForm({ userId, teamOptions, access, onDone }: any) {
       <label>
         Phạm vi
         <select value={scope} onChange={(e) => setScope(e.target.value)}>
-          {(role === 'ADMIN'
+          {(['ADMIN', 'EXECUTIVE'].includes(role)
             ? ['ALL']
             : role === 'EMPLOYEE'
               ? ['SELF']

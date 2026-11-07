@@ -1795,7 +1795,7 @@ test('ACC02/PWD08 · absent or wrong key fails safely and rolls back all account
     'Retry stable test',
   );
 });
-test('ACC09..12 · batch viewers atomic, role expiry, renamed/disabled platform and metadata retain history/entity', async () => {
+test('ACC09..12 · user-only viewers survive job expiry; batch atomic, platform metadata and history preserved', async () => {
   let a = await ok('admin', 'GET', '/platform-accounts/' + ids.upgradeAccount);
   let count = (await ok('admin', 'GET', '/credential-history?account_id=' + a.id)).items.length;
   const invalid = await request('admin', 'PUT', '/platform-accounts/' + a.id + '/viewers', {
@@ -1868,7 +1868,7 @@ test('ACC09..12 · batch viewers atomic, role expiry, renamed/disabled platform 
     "UPDATE grants SET valid_to=now()-interval '1 second' WHERE user_id=$1 AND kind='JOB' AND role='CONTENT'",
     [ids.employee],
   );
-  assert.equal((await request('employee', 'GET', '/platform-accounts/' + a.id)).status, 404);
+  assert.equal((await request('employee', 'GET', '/platform-accounts/' + a.id)).status, 200);
   assert.equal(
     (
       await request(
@@ -2021,7 +2021,7 @@ test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejec
   });
   assert.equal(
     (await request('roleUpgrade', 'GET', '/platform-accounts/' + account.id)).status,
-    404,
+    200,
   );
   assert((await ok('roleUpgrade', 'GET', '/me')).grants.some((g: any) => g.role === 'DESIGNER'));
   assert.equal(
@@ -2043,7 +2043,7 @@ test('HR01/04/06/07 · scoped personnel/files/export, no recruitment UI types, s
   );
   assert(Number(legacy.rows[0].count) >= 0);
   assert.equal((await request('employee', 'GET', '/employees/' + ids.upgradeEmployee)).status, 403);
-  assert.equal((await request('hr', 'GET', '/employees/' + ids.upgradeEmployee)).status, 404);
+  assert.equal((await request('hr', 'GET', '/employees/' + ids.upgradeEmployee)).status, 200);
   const e = await ok('admin', 'GET', '/employees/' + ids.upgradeEmployee);
   assert.equal(e.sensitive_cipher, undefined);
   assert.equal(e.candidate_id, undefined);
@@ -2060,7 +2060,7 @@ test('HR01/04/06/07 · scoped personnel/files/export, no recruitment UI types, s
     (await request('employee', 'GET', '/assets/' + file.json().id + '/download')).status,
     403,
   );
-  assert.equal((await request('hr', 'GET', '/assets/' + file.json().id + '/download')).status, 404);
+  assert.equal((await request('hr', 'GET', '/assets/' + file.json().id + '/download')).status, 200);
   const badClass = await multipartRequest(
     'admin',
     '/assets',
@@ -2251,7 +2251,13 @@ test('HR profile · private photo and tax/insurance/bank fields stay scoped and 
   });
   const normal = await ok('admin', 'GET', '/employees/' + e.id);
   for (const value of Object.values(sensitive)) assert(!JSON.stringify(normal).includes(value));
-  assert.deepEqual((await ok('admin', 'GET', '/employees/' + e.id + '/sensitive')).data, sensitive);
+  const { salary, ...identity } = sensitive;
+  assert.deepEqual((await ok('admin', 'GET', '/employees/' + e.id + '/sensitive')).data, identity);
+  assert.equal(
+    (await ok('hr', 'GET', '/employees/' + e.id + '/payroll')).data.salary,
+    'Private salary fixture',
+  );
+  assert.equal((await request('hr', 'GET', '/employees/' + e.id + '/sensitive')).status, 403);
   const stored = (
     await pool.query('SELECT sensitive_cipher FROM employee_profiles WHERE id=$1', [e.id])
   ).rows[0].sensitive_cipher;
@@ -2354,4 +2360,545 @@ test('Disabled account/session and logout deny subsequent API', async () => {
   assert.equal((await request('outside', 'GET', '/me')).status, 401);
   await ok('ads', 'POST', '/auth/logout', {});
   assert.equal((await request('ads', 'GET', '/me')).status, 401);
+});
+
+const reviewEmployee = (code: string) => ({
+  employee_code: code,
+  name: 'Nhân sự QC được duyệt',
+  joined_on: '2026-11-01',
+  positions: ['CONTENT'],
+  team_id: ids.team,
+  phase: 'OFFICIAL',
+  employment_type: 'FULL_TIME',
+});
+test('Approved HR · company-wide list/detail/export and immutable before/after history', async () => {
+  const leader = await tx((c) =>
+    createUser(
+      c,
+      'review-leader@test.local',
+      'Ban lãnh đạo QC',
+      password,
+      'CONTENT',
+      'EMPLOYEE',
+      ids.team,
+      ids.manager,
+    ),
+  );
+  ids.reviewLeader = leader;
+  const login = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: '127.0.0.222',
+    payload: { username: 'review-leader@test.local', password },
+  });
+  assert.equal(login.statusCode, 200, login.body);
+  clients.reviewLeader = {
+    cookie: login.headers['set-cookie']?.toString().split(';')[0],
+    csrf: login.json().csrf,
+  };
+  const body = reviewEmployee('REVIEW-HR-001');
+  let e = await ok('admin', 'POST', '/employees', body);
+  ids.reviewEmployee = e.id;
+  assert(
+    (await ok('hr', 'GET', '/employees?search=REVIEW-HR-001')).items.some(
+      (v: any) => v.id === e.id,
+    ),
+  );
+  assert.equal((await ok('hr', 'GET', '/employees/' + e.id)).name, body.name);
+  e = await ok('hr', 'PATCH', '/employees/' + e.id, {
+    ...body,
+    name: 'Đã sửa bởi HR',
+    expected_version: e.version,
+  });
+  const h = await ok('hr', 'GET', '/employees/' + e.id + '/history');
+  assert.equal(h.items[0].actor_id, ids.hr);
+  assert.equal(h.items[0].before.name, body.name);
+  assert.equal(h.items[0].after.name, 'Đã sửa bởi HR');
+  assert.equal(h.items[0].category, 'BASIC');
+  assert(h.items[0].created_at);
+  await assert.rejects(() =>
+    pool.query('UPDATE employee_revisions SET action=$1 WHERE id=$2', ['tamper', h.items[0].id]),
+  );
+  await assert.rejects(() =>
+    pool.query('DELETE FROM employee_revisions WHERE id=$1', [h.items[0].id]),
+  );
+  assert.equal((await request('reviewLeader', 'GET', '/employees/' + e.id)).status, 403);
+  const stale = await request('hr', 'PATCH', '/employees/' + e.id, {
+    ...body,
+    name: 'Không được ghi đè',
+    expected_version: e.version - 1,
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await ok('hr', 'GET', '/employees/' + e.id)).name, 'Đã sửa bởi HR');
+  assert.equal((await request('hr', 'GET', '/employees/export?search=REVIEW-HR-001')).status, 200);
+});
+test('Approved privacy · HR payroll only; management is not executive; explicit executive grant required', async () => {
+  let e = await ok('admin', 'GET', '/employees/' + ids.reviewEmployee);
+  await ok('admin', 'PUT', '/employees/' + e.id + '/sensitive', {
+    expected_version: e.version,
+    data: {
+      identity_document: 'IDENTITY-REVIEW-PRIVATE',
+      tax_id: 'TAX-PRIVATE',
+      social_insurance: 'INSURANCE-PRIVATE',
+      bank_name: 'BANK-PRIVATE',
+      bank_account: 'ACCOUNT-PRIVATE',
+      notes: 'PRIVATE-NOTE',
+    },
+  });
+  e = await ok('hr', 'GET', '/employees/' + e.id);
+  await ok('hr', 'PUT', '/employees/' + e.id + '/payroll', {
+    expected_version: e.version,
+    data: { salary: 'SALARY-REVIEW-PRIVATE', bonus: 'BONUS-PRIVATE', notes: 'PAYROLL-PRIVATE' },
+  });
+  assert.equal(
+    (await ok('hr', 'GET', '/employees/' + e.id + '/payroll')).data.salary,
+    'SALARY-REVIEW-PRIVATE',
+  );
+  for (const who of ['hr', 'manager', 'boss'])
+    assert.equal((await request(who, 'GET', '/employees/' + e.id + '/sensitive')).status, 403);
+  assert.equal(
+    (await request('hr', 'GET', '/employees/' + e.id + '/history?category=SENSITIVE')).status,
+    403,
+  );
+  const perm = await ok('reviewLeader', 'GET', '/me');
+  await ok('admin', 'POST', '/users/' + ids.reviewLeader + '/grants', {
+    expected_permission_version: perm.permission_version,
+    job_grants: [],
+    access_grant: { role: 'EXECUTIVE', scope: 'ALL' },
+    reason: 'Cấp Ban lãnh đạo rõ ràng để QC',
+  });
+  assert.equal(
+    (await ok('reviewLeader', 'GET', '/employees/' + e.id + '/sensitive')).data.tax_id,
+    'TAX-PRIVATE',
+  );
+  assert.equal(
+    (await ok('reviewLeader', 'GET', '/employees/' + e.id + '/payroll')).data.salary,
+    'SALARY-REVIEW-PRIVATE',
+  );
+  const list = JSON.stringify(await ok('hr', 'GET', '/employees?search=REVIEW-HR-001'));
+  for (const secret of ['SALARY-REVIEW-PRIVATE', 'BANK-PRIVATE', 'TAX-PRIVATE'])
+    assert(!list.includes(secret));
+  const history = await ok('hr', 'GET', '/employees/' + e.id + '/history?category=PAYROLL');
+  assert.equal(history.items[0].after.salary, 'SALARY-REVIEW-PRIVATE');
+  const stored = (
+    await pool.query('SELECT payroll_cipher FROM employee_profiles WHERE id=$1', [e.id])
+  ).rows[0].payroll_cipher;
+  assert(!stored.includes('SALARY-REVIEW-PRIVATE'));
+  const raw = JSON.stringify(
+    (await pool.query('SELECT * FROM employee_revisions WHERE employee_id=$1', [e.id])).rows,
+  );
+  assert(!raw.includes('SALARY-REVIEW-PRIVATE'));
+  assert(!raw.includes('IDENTITY-REVIEW-PRIVATE'));
+  assert.equal(
+    (
+      await request('reviewLeader', 'PATCH', '/employees/' + e.id, {
+        ...reviewEmployee('REVIEW-HR-001'),
+        expected_version: e.version,
+      })
+    ).status,
+    403,
+  );
+});
+test('Approved checklist · completeness independent of sensitive file read; payroll documents use payroll permission', async () => {
+  const e = await ok('hr', 'GET', '/employees/' + ids.reviewEmployee);
+  await pool.query(
+    `UPDATE settings SET value=jsonb_set(value,'{employee_document_checklists}','{"FULL_TIME":["IDENTITY","PAYROLL"]}') WHERE key='policies'`,
+  );
+  const identity = await multipartRequest(
+    'admin',
+    '/assets',
+    { employee_id: e.id, document_kind: 'IDENTITY', classification: 'SENSITIVE' },
+    'identity.txt',
+    Buffer.from('QC private identity'),
+  );
+  assert.equal(identity.statusCode, 200, identity.body);
+  const payroll = await multipartRequest(
+    'hr',
+    '/assets',
+    { employee_id: e.id, document_kind: 'PAYROLL', classification: 'SENSITIVE' },
+    'payroll.txt',
+    Buffer.from('QC payroll document'),
+  );
+  assert.equal(payroll.statusCode, 200, payroll.body);
+  const hr = await ok('hr', 'GET', '/employees/' + e.id);
+  assert.deepEqual(hr.missing_documents, []);
+  assert(!hr.documents.some((d: any) => d.document_kind === 'IDENTITY'));
+  assert(hr.documents.some((d: any) => d.document_kind === 'PAYROLL'));
+  assert.equal(
+    (await request('hr', 'GET', '/assets/' + identity.json().id + '/download')).status,
+    403,
+  );
+  assert.equal(
+    (await request('hr', 'GET', '/assets/' + payroll.json().id + '/download')).status,
+    200,
+  );
+  assert.equal(
+    (await request('manager', 'GET', '/assets/' + payroll.json().id + '/download')).status,
+    403,
+  );
+});
+test('Approved contract · exactly seven calendar days, active HR recipients only and idempotent worker', async () => {
+  const now = new Date(Date.now() + 7 * 3600e3);
+  now.setUTCDate(now.getUTCDate() + 7);
+  const end = now.toISOString().slice(0, 10);
+  await pool.query('UPDATE employee_profiles SET contract_end=$2 WHERE id=$1', [
+    ids.reviewEmployee,
+    end,
+  ]);
+  await pool.query(
+    `UPDATE settings SET value=value||'{"contract_reminders_enabled":true,"contract_reminder_days":[7]}'::jsonb WHERE key='policies'`,
+  );
+  await runJobs();
+  await runJobs();
+  const key = `contract:${ids.reviewEmployee}:${end}:7`;
+  const n = (
+    await pool.query('SELECT user_id,message FROM notifications WHERE event_key=$1', [key])
+  ).rows;
+  assert(n.some((v: any) => v.user_id === ids.hr));
+  assert(
+    !n.some((v: any) => [ids.admin, ids.manager, ids.boss, ids.reviewLeader].includes(v.user_id)),
+  );
+  assert.equal(n.filter((v: any) => v.user_id === ids.hr).length, 1);
+  assert(n.every((v: any) => !v.message.includes('SALARY')));
+  assert((await ok('hr', 'GET', '/notifications')).items.some((v: any) => v.event_key === key));
+  await pool.query(
+    `UPDATE grants SET revoked_at=now() WHERE user_id=$1 AND kind='JOB' AND role='HR'`,
+    [ids.hr],
+  );
+  assert(!(await ok('hr', 'GET', '/notifications')).items.some((v: any) => v.event_key === key));
+  await pool.query(
+    `UPDATE grants SET revoked_at=NULL WHERE user_id=$1 AND kind='JOB' AND role='HR'`,
+    [ids.hr],
+  );
+});
+test('Approved shares · platform inheritance, future accounts, account override, reverse lookup and immediate revoke', async () => {
+  const p = await ok('admin', 'POST', '/platforms', { name: 'QC approved sharing' });
+  ids.reviewPlatform = p.id;
+  let share = await ok('admin', 'GET', '/platforms/' + p.id + '/viewers');
+  await ok('admin', 'PUT', '/platforms/' + p.id + '/viewers', {
+    viewer_ids: [ids.hr],
+    expected_sharing_version: share.sharing_version,
+  });
+  const a = await ok('admin', 'POST', '/platform-accounts', {
+    platform_id: p.id,
+    label: 'Inherited A',
+    login: 'inherited-a',
+    company: 'QC',
+    secret: 'Encrypted-QC-Secret',
+  });
+  ids.reviewAccount = a.id;
+  assert.equal((await ok('hr', 'GET', '/platform-accounts/' + a.id)).id, a.id);
+  assert.equal(
+    (await ok('hr', 'POST', '/platform-accounts/' + a.id + '/reveal', {})).secret,
+    'Encrypted-QC-Secret',
+  );
+  assert(
+    (await ok('admin', 'GET', '/platform-accounts?viewer_id=' + ids.hr)).items.some(
+      (v: any) => v.id === a.id,
+    ),
+  );
+  assert(a.viewers.some((v: any) => v.user_id === ids.hr && v.source === 'PLATFORM'));
+  let detail = await ok('admin', 'GET', '/platform-accounts/' + a.id);
+  detail = await ok('admin', 'PUT', '/platform-accounts/' + a.id + '/viewers', {
+    viewer_ids: [],
+    expected_sharing_version: detail.sharing_version,
+  });
+  assert.equal(
+    (await request('hr', 'POST', '/platform-accounts/' + a.id + '/reveal', {})).status,
+    404,
+  );
+  await ok('admin', 'DELETE', '/platform-accounts/' + a.id + '/viewers', {
+    expected_sharing_version: detail.sharing_version,
+  });
+  assert.equal((await request('hr', 'GET', '/platform-accounts/' + a.id)).status, 200);
+  share = await ok('admin', 'GET', '/platforms/' + p.id + '/viewers');
+  await ok('admin', 'PUT', '/platforms/' + p.id + '/viewers', {
+    viewer_ids: [],
+    expected_sharing_version: share.sharing_version,
+  });
+  assert.equal((await request('hr', 'GET', '/platform-accounts/' + a.id)).status, 404);
+  assert(
+    !(await ok('admin', 'GET', '/platform-accounts?viewer_id=' + ids.hr)).items.some(
+      (v: any) => v.id === a.id,
+    ),
+  );
+  assert(
+    (await ok('admin', 'GET', '/account-sharing-history?object_id=' + a.id)).items.length >= 2,
+  );
+  assert.equal(
+    (await request('hr', 'GET', '/platform-accounts?viewer_id=' + ids.admin)).status,
+    403,
+  );
+});
+test('Approved task forms · all non-warehouse templates have purpose-specific fields', async () => {
+  const all = (await ok('admin', 'GET', '/task-types')).items;
+  for (const t of all.filter(
+    (t: any) => t.code !== 'OTHER' && !t.roles.every((r: string) => r === 'WAREHOUSE'),
+  )) {
+    assert(t.fields.length >= 2, `${t.code} needs a purpose-specific form`);
+    assert(!t.fields.every((f: any) => f.key === 'summary'), t.code);
+  }
+  assert.equal(all.find((t: any) => t.code === 'PRODUCT_RESEARCH').output_policy, 'FILE_REQUIRED');
+  assert.equal(all.find((t: any) => t.code === 'SHOOT').workflow.length, 6);
+});
+test('Approved research · text or URL cannot bypass the required document file', async () => {
+  let t = await ok('hr', 'POST', '/tasks', {
+    title: 'QC phân tích sản phẩm',
+    role: 'HR',
+    type: 'OTHER',
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  // Content worker uses their current role; roleUpgrade CONTENT was revoked in an earlier scenario.
+  t = await ok('employee', 'POST', '/tasks', {
+    title: 'QC phân tích sản phẩm',
+    role: 'CONTENT',
+    type: 'PRODUCT_RESEARCH',
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  assert.equal(
+    (
+      await request('employee', 'POST', '/tasks/' + t.id + '/submissions', {
+        expected_version: t.version,
+        result_text: 'Xong',
+        links: ['https://example.com/research'],
+      })
+    ).data.code,
+    'DOCUMENT_REQUIRED',
+  );
+  const upload = await multipartRequest(
+    'employee',
+    '/assets',
+    { task_id: t.id },
+    'analysis.txt',
+    Buffer.from('QC research report'),
+  );
+  assert.equal(upload.statusCode, 200, upload.body);
+  t = await ok('employee', 'POST', '/tasks/' + t.id + '/submissions', {
+    expected_version: t.version,
+    result_text: 'Đã phân tích',
+    artifact_refs: [upload.json().id],
+  });
+  assert.equal(t.status, 'SUBMITTED');
+});
+test('Approved video · stage order and published proof are enforced by server', async () => {
+  let t = await ok('employee', 'POST', '/tasks', {
+    title: 'QC sản xuất video',
+    role: 'CONTENT',
+    type: 'SHOOT',
+    due_at: new Date(Date.now() + 86400e3).toISOString(),
+  });
+  let r = await request('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    expected_version: t.version,
+    state: 'IN_PROGRESS',
+    payload: { workflow_step: 'publish' },
+  });
+  assert.equal(r.data.code, 'WORKFLOW_ORDER');
+  r = await request('employee', 'POST', '/tasks/' + t.id + '/submissions', {
+    expected_version: t.version,
+    result_text: 'Chỉ có quay',
+    links: ['https://example.com/footage'],
+  });
+  assert.equal(r.status, 422);
+  const payload = {
+    script: 'Kịch bản QC',
+    shoot_plan: 'Kế hoạch QC',
+    shoot_at: new Date(Date.now() - 86400e3).toISOString(),
+    participants: [ids.employee, ids.support],
+    footage_links: ['https://example.com/footage'],
+    edit_notes: 'Đã chỉnh sửa',
+    edited_video_url: 'https://example.com/final',
+    publish_on: new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10),
+    published_at: new Date().toISOString(),
+    platform: 'TikTok',
+    publication_url: 'https://example.com/video/approved',
+  };
+  t = await ok('employee', 'POST', '/tasks/' + t.id + '/update-result', {
+    expected_version: t.version,
+    state: 'IN_PROGRESS',
+    payload: { ...payload, workflow_step: 'plan' },
+  });
+  assert.equal(t.payload.workflow_step, 'plan');
+  r = await request('employee', 'POST', '/tasks/' + t.id + '/submissions', {
+    expected_version: t.version,
+    result_text: 'Đã đăng',
+    payload: { ...payload, published_at: new Date(Date.now() + 86400e3).toISOString() },
+    links: [payload.publication_url],
+  });
+  assert.equal(r.data.code, 'PUBLICATION_FUTURE');
+  t = await ok('employee', 'POST', '/tasks/' + t.id + '/submissions', {
+    expected_version: t.version,
+    result_text: 'Đã đăng',
+    payload,
+  });
+  assert.equal(t.status, 'SUBMITTED');
+  assert(t.submissions[0].links.includes(payload.publication_url));
+  const snapshot = t.template_snapshot;
+  await pool.query('UPDATE task_templates SET enabled=false WHERE code=$1', ['SHOOT']);
+  assert.deepEqual((await ok('employee', 'GET', '/tasks/' + t.id)).template_snapshot, snapshot);
+  await pool.query('UPDATE task_templates SET enabled=true WHERE code=$1', ['SHOOT']);
+});
+
+test('Approved migration · preserves credentials and task snapshots; carries only effective legacy shares', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { upgradeTaskForms } = await import('../server/template-store.js');
+  const c = await pool.connect();
+  const schema = 'review_migration_' + randomUUID().replaceAll('-', '');
+  try {
+    await c.query('BEGIN');
+    await c.query('CREATE SCHEMA ' + schema);
+    await c.query('SET LOCAL search_path TO ' + schema + ',public');
+    for (const name of ['001', '002', '003', '004', '005', '006']) {
+      await c.query(readFileSync('migrations/' + name + '.sql', 'utf8'));
+      if (name === '005') await seedTemplateMigration(c);
+    }
+    const admin = await one(
+      c,
+      "INSERT INTO users(username,name,password_hash) VALUES('migration_admin','Admin','hash-fixture') RETURNING id",
+    );
+    const user = await one(
+      c,
+      "INSERT INTO users(username,name,password_hash) VALUES('migration_user','User','hash-fixture') RETURNING id",
+    );
+    await c.query(
+      "INSERT INTO grants(user_id,kind,role,scope,reason) VALUES($1,'JOB','CONTENT','SELF','test')",
+      [user.id],
+    );
+    const platform = await one(c, 'SELECT id,name FROM platforms LIMIT 1');
+    const account = await one(
+      c,
+      'INSERT INTO platform_accounts(platform,platform_id,label,login,company) VALUES($1,$2,$3,$4,$5) RETURNING id',
+      [platform.name, platform.id, 'Legacy preserved', 'legacy', 'QC'],
+    );
+    await c.query(
+      "INSERT INTO account_grants(account_id,user_id,role,granted_by) VALUES($1,$2,'CONTENT',$3)",
+      [account.id, user.id, admin.id],
+    );
+    const denied = await one(
+      c,
+      'INSERT INTO platform_accounts(platform,platform_id,label,login,company) VALUES($1,$2,$3,$4,$5) RETURNING id',
+      [platform.name, platform.id, 'Expired role', 'expired', 'QC'],
+    );
+    await c.query(
+      "INSERT INTO account_grants(account_id,user_id,role,granted_by) VALUES($1,$2,'ADS',$3)",
+      [denied.id, user.id, admin.id],
+    );
+    const { cipher } = await import('../server/base.js');
+    const encrypted = cipher('Migration secret fixture');
+    const credential = await one(
+      c,
+      'INSERT INTO credential_versions(account_id,ciphertext,actor_id,revision) VALUES($1,$2,$3,1) RETURNING id',
+      [account.id, encrypted, admin.id],
+    );
+    const oldSnapshot = {
+      code: 'SHOOT',
+      fields: [{ key: 'legacy', label: 'Old' }],
+      name: 'Old unchanged',
+    };
+    const task = await one(
+      c,
+      "INSERT INTO tasks(title,owner_id,created_by,role,type,status,source,template_snapshot) VALUES('Legacy task',$1,$1,'CONTENT','SHOOT','DRAFT','EMPLOYEE_ADHOC',$2) RETURNING id",
+      [user.id, JSON.stringify(oldSnapshot)],
+    );
+    await c.query(readFileSync('migrations/007.sql', 'utf8'));
+    await upgradeTaskForms(c);
+    assert.equal(
+      (
+        await one(
+          c,
+          'SELECT count(*)::int AS n FROM account_viewer_overrides WHERE account_id=$1 AND user_id=$2 AND allowed',
+          [account.id, user.id],
+        )
+      ).n,
+      1,
+    );
+    assert.equal(
+      (
+        await one(
+          c,
+          'SELECT count(*)::int AS n FROM account_viewer_overrides WHERE account_id=$1',
+          [denied.id],
+        )
+      ).n,
+      0,
+    );
+    assert.equal(
+      (await one(c, 'SELECT ciphertext FROM credential_versions WHERE id=$1', [credential.id]))
+        .ciphertext,
+      encrypted,
+    );
+    assert.deepEqual(
+      (await one(c, 'SELECT template_snapshot FROM tasks WHERE id=$1', [task.id]))
+        .template_snapshot,
+      oldSnapshot,
+    );
+  } finally {
+    await c.query('ROLLBACK');
+    c.release();
+  }
+});
+
+test('Company LAN login · per-account lockout does not block a different employee at the same IP', async () => {
+  const ip = '127.0.0.244';
+  for (let i = 0; i < 10; i++) {
+    const r = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      remoteAddress: ip,
+      payload: { username: 'employee@test.local', password: 'Wrong-password-for-QC' },
+    });
+    assert.equal(r.statusCode, 401);
+  }
+  const locked = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: ip,
+    payload: { username: 'EMPLOYEE@test.local', password },
+  });
+  assert.equal(locked.statusCode, 429);
+  const other = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: ip,
+    payload: { username: 'hr@test.local', password },
+  });
+  assert.equal(other.statusCode, 200, other.body);
+  // A separate IP cap also covers invalid/unknown usernames without exposing account existence.
+  for (let i = 11; i < 100; i++)
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      remoteAddress: ip,
+      payload: { username: 'invalid-' + i, password: '' },
+    });
+  const capped = await app.inject({
+    method: 'POST',
+    url: '/api/v1/auth/login',
+    remoteAddress: ip,
+    payload: { username: 'another-new-name', password: '' },
+  });
+  assert.equal(capped.statusCode, 429);
+});
+
+test('Dashboard totals · count all matching authorized tasks beyond the first 100 rows', async () => {
+  const template = (await ok('admin', 'GET', '/task-types')).items.find(
+    (t: any) => t.code === 'OTHER',
+  );
+  await pool.query(
+    `INSERT INTO tasks(title,owner_id,created_by,reviewer_id,role,type,status,source,template_snapshot)
+   SELECT 'QC-count-over-100 '||n,$1,$1,$2,'CONTENT','OTHER','DRAFT','EMPLOYEE_ADHOC',$3 FROM generate_series(1,105) n`,
+    [ids.employee, ids.manager, JSON.stringify(template)],
+  );
+  const list = await ok('employee', 'GET', '/tasks?mode=mine&search=QC-count-over-100');
+  assert.equal(list.items.length, 100);
+  assert.equal(list.summary.total, 105);
+  assert(list.next_cursor);
+  const last = await ok(
+    'employee',
+    'GET',
+    '/tasks?mode=mine&search=QC-count-over-100&cursor=' + list.next_cursor,
+  );
+  assert.equal(last.items.length, 5);
+  assert.equal(last.summary.total, 105);
+  const hr = await ok('hr', 'GET', '/tasks?mode=mine&search=QC-count-over-100');
+  assert.equal(hr.summary.total, 0);
 });

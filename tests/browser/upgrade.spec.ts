@@ -41,6 +41,7 @@ test('Upgrade UI · accounts/viewers/password history, employee drawer/files/exp
   await modal.getByLabel('Tài khoản đăng nhập', { exact: true }).fill('upgrade.login');
   await modal.getByLabel('Mật khẩu nền tảng', { exact: true }).fill('short');
   await modal.getByLabel('Pháp nhân', { exact: true }).fill('Công ty kiểm thử');
+  await modal.getByLabel('Dùng người xem của nền tảng (gồm tài khoản tạo mới)').uncheck();
   await modal.getByLabel('Tìm người được xem').fill('employee');
   await modal.getByRole('checkbox', { name: /^employee / }).check();
   await modal.getByLabel('Tìm người được xem').fill('support');
@@ -110,15 +111,15 @@ test('Upgrade UI · accounts/viewers/password history, employee drawer/files/exp
   await modal.getByLabel('Mã nhân sự', { exact: true }).fill(employeeCode);
   await modal.getByLabel('Họ tên', { exact: true }).fill('Nhân sự E2E ' + suffix);
   await modal.getByLabel('Ngày vào làm', { exact: true }).fill('2026-11-01');
-  await modal.getByLabel('Content', { exact: true }).check();
+  await modal.getByLabel('Nội dung', { exact: true }).check();
   await modal.getByLabel('Thiết kế', { exact: true }).check();
   await modal.getByLabel('Bộ phận', { exact: true }).selectOption({ index: 1 });
   await modal.getByRole('button', { name: 'Lưu hồ sơ nhân viên', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'Hồ sơ nhân viên', exact: true });
   await expect(drawer).toBeVisible();
-  await expect(drawer.getByRole('tab')).toHaveCount(3);
+  await expect(drawer.getByRole('tab')).toHaveCount(4);
   await drawer.getByRole('tab', { name: 'Công việc', exact: true }).click();
-  await expect(drawer.getByText(/Content ·/)).toBeVisible();
+  await expect(drawer.getByText(/Nội dung ·/)).toBeVisible();
   await drawer.getByRole('tab', { name: 'Tài liệu', exact: true }).click();
   await drawer.getByLabel('Tệp hồ sơ nhân sự', { exact: true }).setInputFiles({
     name: 'employee-e2e.txt',
@@ -172,7 +173,7 @@ test('Upgrade UI · accounts/viewers/password history, employee drawer/files/exp
   await modal
     .getByLabel('Mật khẩu khởi tạo (ít nhất 11 ký tự)', { exact: true })
     .fill('UI-User-Test-2026!');
-  await modal.getByLabel('Content', { exact: true }).check();
+  await modal.getByLabel('Nội dung', { exact: true }).check();
   await modal.getByLabel('Thiết kế', { exact: true }).check();
   await modal
     .getByLabel('Liên kết nhân viên đã có (không bắt buộc)')

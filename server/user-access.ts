@@ -1,3 +1,4 @@
+import { employeeRevision, basicSnapshot } from './employee-history.js';
 import { hash as passwordHash } from 'argon2';
 import { z } from 'zod';
 import type { API } from './app.js';
@@ -61,7 +62,7 @@ export async function addGrant(c: DB, a: Actor, uid: string, input: any) {
     'VALIDATION',
   );
   need(
-    v.role !== 'ADMIN' || v.scope === 'ALL',
+    !['ADMIN', 'EXECUTIVE'].includes(v.role) || v.scope === 'ALL',
     'Admin phải có phạm vi toàn công ty',
     422,
     'VALIDATION',
@@ -117,7 +118,10 @@ export async function createUserWithAccess(c: DB, a: Actor, b: any) {
       username: z
         .string()
         .trim()
-        .regex(/^[A-Za-z0-9_.-]{3,64}$/),
+        .regex(
+          /^[A-Za-z0-9_.-]{3,64}$/,
+          'Tên đăng nhập cần 3–64 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang',
+        ),
       email: z.email().nullable().optional(),
       name: z.string().trim().min(1).max(120),
       password: z
@@ -166,11 +170,20 @@ export async function createUserWithAccess(c: DB, a: Actor, b: any) {
   );
   for (const g of v.job_grants) await addGrant(c, a, u.id, { ...g, kind: 'JOB', scope: 'SELF' });
   await addGrant(c, a, u.id, { ...v.access_grant, kind: 'ACCESS' });
-  if (employee)
+  if (employee) {
     await c.query('UPDATE employee_profiles SET user_id=$2,version=version+1 WHERE id=$1', [
       employee.id,
       u.id,
     ]);
+    await employeeRevision(
+      c,
+      a,
+      employee.id,
+      'USER_LINKED',
+      basicSnapshot(employee),
+      basicSnapshot({ ...employee, user_id: u.id }),
+    );
+  }
   return { id: u.id, permissions: await actor(c, u.id) };
 }
 export function userAccessRoutes(api: API) {

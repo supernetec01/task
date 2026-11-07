@@ -12,6 +12,7 @@ import {
   options,
   statusLabel,
   roleLabel,
+  useHourlyRefresh,
 } from './ui';
 import { TaskTable, TaskDetail, CreateTask } from './tasks';
 import { Reports, Plans, Summary } from './reports';
@@ -44,6 +45,35 @@ const names: Record<string, string> = {
   history: 'Lịch sử mật khẩu',
   issues: 'Kiểm thử',
 };
+function NavIcon({ name }: { name: string }) {
+  const paths: Record<string, string> = {
+    dashboard: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+    mine: 'M20 11v8H4V4h10 M8 11l4 4 9-10',
+    hr: 'M9 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M2 22v-3a7 7 0 0 1 14 0v3 M17 4a4 4 0 0 1 0 8 M18 15a6 6 0 0 1 5 6',
+    accounts: 'M15 4a6 6 0 1 1-4 10L4 21H1v-3l7-7a6 6 0 0 1 7-7z M16 8h.01',
+    settings:
+      'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',
+    notifications: 'M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 21h4',
+    users: 'M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6z M8 12l3 3 5-6',
+  };
+  const path =
+    paths[name] || (['team'].includes(name) ? paths.hr : 'M4 3h16v18H4z M8 8h8 M8 12h8 M8 16h5');
+  return (
+    <svg
+      aria-hidden="true"
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={path} />
+    </svg>
+  );
+}
 function App() {
   const [me, setMe] = useState<any>(null),
     [ready, setReady] = useState(false),
@@ -54,7 +84,9 @@ function App() {
     [task, setTask] = useState(''),
     [revision, setRevision] = useState(0),
     [sub, setSub] = useState(''),
-    [filter, setFilter] = useState('');
+    [filter, setFilter] = useState(''),
+    [employeeFocus, setEmployeeFocus] = useState('');
+  useHourlyRefresh(() => setRevision((r) => r + 1));
   const permissionKey = useRef('');
   const [accessRevision, setAccessRevision] = useState(0);
   const loadMe = async () => {
@@ -86,10 +118,13 @@ function App() {
     const refresh = () => {
       void loadMe();
     };
+    const refreshList = () => setRevision((r) => r + 1);
+    window.addEventListener('sn-list-refresh', refreshList);
     window.addEventListener('sn-access-refresh', refresh);
     return () => {
       clearInterval(timer);
       window.removeEventListener('sn-access-refresh', refresh);
+      window.removeEventListener('sn-list-refresh', refreshList);
     };
   }, []);
   const groups: { id: string; label: string; items: string[] }[] =
@@ -158,17 +193,7 @@ function App() {
               {group.items.map((n) => (
                 <button key={n} className={current === n ? 'active' : ''} onClick={() => go(n)}>
                   <span className="nav-icon" aria-hidden="true">
-                    {(
-                      {
-                        dashboard: '▦',
-                        mine: '☑',
-                        team: '♧',
-                        plans: '▤',
-                        reports: '▥',
-                        templates: '▤',
-                        settings: '⚙',
-                      } as Record<string, string>
-                    )[n] || '◇'}
+                    <NavIcon name={n} />
                   </span>
                   {names[n]}
                 </button>
@@ -209,7 +234,7 @@ function App() {
           <div className="actions">
             {me.demo && <Badge>MÔI TRƯỜNG DEMO</Badge>}
             <button className="ghost" aria-label="Thông báo" onClick={() => go('notifications')}>
-              ♧
+              <NavIcon name="notifications" />
             </button>
             <span className="avatar">{me.name.slice(0, 1)}</span>
           </div>
@@ -275,7 +300,7 @@ function App() {
               ) : sub === 'Hiệu quả livestream' ? (
                 <Metrics kind="LIVE" />
               ) : current === 'hr' ? (
-                <EmployeeDirectory me={me} />
+                <EmployeeDirectory me={me} initialSelected={employeeFocus} />
               ) : (
                 <Records key={current} module={current} me={me} />
               )}
@@ -284,7 +309,14 @@ function App() {
           {current === 'requests' && <Requests me={me} />} {current === 'users' && <Team me={me} />}{' '}
           {current === 'templates' && <TemplateAdmin />}
           {current === 'settings' && <Settings />} {current === 'accounts' && <Accounts me={me} />}{' '}
-          {current === 'notifications' && <Notifications />}{' '}
+          {current === 'notifications' && (
+            <Notifications
+              onEmployee={(id: string) => {
+                setEmployeeFocus(id);
+                go('hr');
+              }}
+            />
+          )}{' '}
           {current === 'history' && <PasswordHistory />}{' '}
           {current === 'profile' && (
             <div className="panel">
@@ -346,7 +378,7 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
     revision,
   );
   const items = data?.items || [];
-  const s = {
+  const s = data?.summary || {
     total: items.length,
     done: items.filter((t: any) => t.status === 'DONE').length,
     on_time: items.filter((t: any) => t.timing === 'ON_TIME').length,
@@ -355,20 +387,26 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
   };
   return (
     <>
+      <button
+        className="list-refresh"
+        onClick={() => window.dispatchEvent(new Event('sn-list-refresh'))}
+      >
+        Tải lại danh sách
+      </button>
       <Loaded data={data} error={error}>
         {mode === 'dashboard' ? (
           <>
             <div className="welcome">
               <h3>Chào {me.name}.</h3>
               <p>
-                {s.open} công việc đang mở trong danh sách hiện tại. Cùng theo dõi tiến độ, thời hạn
-                và những việc cần hỗ trợ.
+                {s.open} công việc đang mở trong phạm vi bạn được xem. Cùng theo dõi tiến độ, thời
+                hạn và những việc cần hỗ trợ.
               </p>
             </div>
             <Summary s={s} onFilter={onList} />
             <small>
-              Tổng hợp danh sách đang hiển thị, tối đa 100 mục/trang; báo cáo tuần có tập dữ liệu
-              riêng.
+              Tổng hợp toàn bộ công việc trong phạm vi và bộ lọc hiện tại, không giới hạn theo
+              trang. Báo cáo tuần có kỳ riêng.
             </small>
             <div className="grid">
               <div className="panel">
@@ -386,14 +424,18 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
                       <i
                         style={{
                           width:
-                            (items.length
-                              ? (items.filter((t: any) => t.status === st).length / items.length) *
+                            (s.total
+                              ? ((s.status_counts?.[st] ??
+                                  items.filter((t: any) => t.status === st).length) /
+                                  s.total) *
                                 100
                               : 0) + '%',
                         }}
                       />
                     </div>
-                    <span>{items.filter((t: any) => t.status === st).length}</span>
+                    <span>
+                      {s.status_counts?.[st] ?? items.filter((t: any) => t.status === st).length}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -507,16 +549,21 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
     </>
   );
 }
-function Notifications() {
+function Notifications({ onEmployee }: any) {
   const [rev, setRev] = useState(0),
     { data, error } = useLoad('/notifications', rev);
+  useHourlyRefresh(() => setRev((r) => r + 1));
   return (
     <Loaded data={data} error={error}>
       <div className="panel">
+        <button onClick={() => setRev((r) => r + 1)}>Tải lại thông báo</button>
         {data?.items.length ? (
           data.items.map((n: any) => (
             <div className="notification" key={n.id}>
               <p>{n.message}</p>
+              {n.event_key.startsWith('contract:') && n.object_id && (
+                <button onClick={() => onEmployee(n.object_id)}>Mở hồ sơ nhân sự</button>
+              )}
               {n.read_at ? (
                 <Badge>Đã đọc</Badge>
               ) : (
