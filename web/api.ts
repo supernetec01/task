@@ -1,3 +1,4 @@
+import { requestKey } from './request-key';
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -19,7 +20,7 @@ export async function api(
   const headers: Record<string, string> = {};
   if (body !== undefined) {
     headers['x-csrf-token'] = csrf;
-    headers['idempotency-key'] = key || crypto.randomUUID();
+    headers['idempotency-key'] = key || requestKey();
     if (!(body instanceof FormData)) headers['content-type'] = 'application/json';
   }
   const opts: RequestInit = {
@@ -43,8 +44,23 @@ export async function api(
       );
     }
   }
-  const data = await response.json();
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    throw new ApiError(
+      response.status,
+      'INVALID_RESPONSE',
+      'Máy chủ chưa trả dữ liệu hợp lệ. Hãy tải lại trang hoặc liên hệ quản trị viên.',
+    );
+  }
   if (!response.ok) throw new ApiError(response.status, data.code, data.message, data.field_errors);
+  if (path === '/me' && (!data?.id || typeof data.name !== 'string' || !Array.isArray(data.grants)))
+    throw new ApiError(
+      502,
+      'INVALID_SESSION',
+      'Dữ liệu phiên đăng nhập không hợp lệ. Hãy tải lại trang hoặc liên hệ quản trị viên.',
+    );
   return data;
 }
 export function iso(local: string) {

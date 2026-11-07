@@ -1,4 +1,5 @@
 import { api } from './api';
+import { requestKey } from './request-key';
 import React, { useEffect, useState, useRef, type ReactNode } from 'react';
 export type Field = {
   key: string;
@@ -171,7 +172,8 @@ export function Form({
     [busy, setBusy] = useState(false),
     [error, setError] = useState<any>(),
     [saved, setSaved] = useState(false);
-  const key = useRef(crypto.randomUUID());
+  const key = useRef('');
+  if (!key.current) key.current = requestKey();
   return (
     <form
       onSubmit={async (e) => {
@@ -182,7 +184,7 @@ export function Form({
         setError(null);
         try {
           await onSubmit(value, key.current);
-          key.current = crypto.randomUUID();
+          key.current = requestKey();
           setSaved(true);
           form.dispatchEvent(new Event('sn-saved', { bubbles: true }));
         } catch (e) {

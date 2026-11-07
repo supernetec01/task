@@ -1,5 +1,15 @@
 # Báo cáo kiểm thử — 06/11/2026
 
+## Sửa trang trắng khi truy cập HTTP LAN — 07/11/2026
+
+Đã tái hiện với bản build trước sửa trên HTTP origin mô phỏng LAN: `isSecureContext=false`, `crypto.randomUUID` không tồn tại, Form ném `crypto.randomUUID is not a function`, body trống trong khi CSS vẫn tải. Các bài browser trước chỉ dùng localhost (được trình duyệt coi là secure context), nên không bắt được lỗi này.
+
+Bản sửa dùng CSPRNG `crypto.getRandomValues` để tạo UUID v4 khi randomUUID không có; không dùng Math.random và không cần tắt bảo vệ trình duyệt. Form giữ key qua lần retry, chỉ đổi sau lưu thành công. API mutations cũng dùng cùng helper. Error boundary hiển thị hướng dẫn tải lại thay vì trang trắng; lỗi JSON/session không hợp lệ được chuyển thành thông báo dễ đọc. HTML có nội dung chờ tải cho trường hợp bundle chưa chạy.
+
+Build đạt. Bộ unit/integration đạt 44/44 trên DB test mới riêng. Browser đạt 14 bài desktop/mobile gồm HTTP LAN origin, đăng nhập và lưu task qua API thật, phản hồi HTML/phiên lỗi, cùng 8 luồng E2E hiện có; thêm 2 kiểm tra nhắm vào render-exception fallback. LAN origin được mô phỏng bằng Playwright route: browser giữ HTTP insecure-context thật, mọi request được phục vụ từ server loopback; không gửi dữ liệu tới tên miền bên ngoài. Đây không phải nghiệm thu kết nối/firewall giữa hai máy thật của công ty.
+
+Để cập nhật Windows: dừng API bằng Ctrl+C, `git pull`, `npm ci`, `npm run build`, `npm start`, rồi Ctrl+F5 tại địa chỉ IP LAN. Không có migration mới hoặc thay đổi tài khoản/mật khẩu cho bản sửa này. Không bật cờ insecure-origin trong Chrome để xử lý lỗi.
+
 ## Phạm vi đã chạy
 
 Môi trường thực thi: Debian 13, Node.js 24.22.1, PostgreSQL 17 image chính thức pin digest, Chromium headless. Database thử nghiệm tách khỏi DB thiết kế ban đầu và không có dữ liệu công ty thật. Không có dữ liệu fixture hoặc mật khẩu thật được commit trong `.env`/backup. Dữ liệu mẫu trong tests chỉ là synthetic fixture.

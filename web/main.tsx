@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { AppErrorBoundary } from './error-boundary';
 import { api, setCsrf } from './api';
 import {
   Form,
@@ -562,4 +563,8 @@ function Audit() {
     </Loaded>
   );
 }
-createRoot(document.getElementById('root')!).render(<App />);
+createRoot(document.getElementById('root')!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);
