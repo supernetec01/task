@@ -10,8 +10,9 @@ Mã thực thi và migration là nguồn hiện trạng. Các gói đặc tả, 
 | Nội dung/video | `server/content.ts`, `web/content-v2.tsx` |
 | Nhập nguồn và chỉ số | `server/source-parser.ts`, `source-imports.ts`, `config/import-adapters.json` |
 | Nhân sự | `server/hr.ts`, `employees.ts`, `hr-jobs.ts`, `web/hr-v2.tsx` |
+| Đơn hàng / KOC | `server/orders.ts`, `web/orders.tsx`, `web/notifications.tsx`, `migrations/012.sql` |
 | Báo cáo | `server/report-v2.ts`, `reports.ts`, `web/reports.tsx` |
-| DB | `migrations/001.sql` đến `011.sql`, áp dụng theo thứ tự trong một transaction |
+| DB | `migrations/001.sql` đến `012.sql`, áp dụng theo thứ tự trong một transaction |
 | Hồi quy | `tests/*.test.ts`, `tests/browser/`, `tests/fixtures/` |
 
 Không sửa migration đã áp dụng để đổi mô hình; thêm migration tiếp theo. Không xóa bảng hoặc reset dữ liệu để bắt đầu lại giao diện. Các chức năng cũ vẫn phục vụ đọc/làm việc với dữ liệu hiện có; mọi thao tác cấp quyền đều phải qua danh sách 5 ROLE. Chỉ số ADS, loại hình thực tập, nhãn EMPLOYEE của đối tượng nhân sự và tên sự kiện lịch sử không phải ROLE truy cập.

@@ -50,6 +50,7 @@ import { contentAccess, publicationAccess } from './content.js';
 import { sourceBatch } from './source-imports.js';
 import { hrRoutes } from './hr.js';
 import { videoWindowRoutes } from './video-window.js';
+import { orderRoutes, canReadOrders } from './orders.js';
 import { logStream } from './logging.js';
 export type Handler = (
   c: DB,
@@ -658,27 +659,62 @@ export async function buildApp() {
     ]);
     return { ok: true };
   });
-  api('GET', '/notifications', async (c, a) => ({
-    items: await rows(
+  const notificationVisibility = `user_id=$1 AND ($2 OR (event_key NOT LIKE 'contract:%' AND event_key NOT LIKE 'birthday:%' AND event_key NOT LIKE 'hr:%')) AND ($3 OR event_key NOT LIKE 'koc-video:%')`;
+  api('GET', '/notifications', async (c, a, b, q) => {
+    const v = z
+      .object({
+        category: z.enum(['ALL', 'KOC', 'OTHER']).default('ALL'),
+        unread: z.enum(['', 'true']).default(''),
+        page: z.coerce.number().int().min(0).default(0),
+      })
+      .strict()
+      .parse(q);
+    const args = [a.id, hasJob(a, 'HR'), canReadOrders(a)];
+    const counts = await one(
       c,
-      "SELECT * FROM notifications WHERE user_id=$1 AND ($2 OR (event_key NOT LIKE 'contract:%' AND event_key NOT LIKE 'birthday:%' AND event_key NOT LIKE 'hr:%')) ORDER BY (read_at IS NOT NULL),created_at DESC,id LIMIT 100",
-      [a.id, hasJob(a, 'HR')],
-    ),
-    unread_count: Number(
-      (
-        await one(
-          c,
-          "SELECT count(*) FROM notifications WHERE user_id=$1 AND read_at IS NULL AND ($2 OR (event_key NOT LIKE 'contract:%' AND event_key NOT LIKE 'birthday:%' AND event_key NOT LIKE 'hr:%'))",
-          [a.id, hasJob(a, 'HR')],
-        )
-      ).count,
-    ),
-  }));
+      `SELECT count(*) FILTER(WHERE read_at IS NULL)::int AS unread_count,
+      count(*) FILTER(WHERE read_at IS NULL AND event_key LIKE 'koc-video:%')::int AS koc_unread_count,
+      count(*)::int AS total_count FROM notifications WHERE ${notificationVisibility}`,
+      args,
+    );
+    const where =
+      notificationVisibility +
+      ` AND ($4='ALL' OR ($4='KOC' AND event_key LIKE 'koc-video:%') OR ($4='OTHER' AND event_key NOT LIKE 'koc-video:%')) AND ($5='' OR read_at IS NULL)`;
+    return {
+      ...counts,
+      items: await rows(
+        c,
+        `SELECT * FROM notifications WHERE ${where} ORDER BY (read_at IS NOT NULL),created_at DESC,id LIMIT 100 OFFSET $6`,
+        [...args, v.category, v.unread, v.page * 100],
+      ),
+      filtered_count: Number(
+        (
+          await one(c, `SELECT count(*) FROM notifications WHERE ${where}`, [
+            ...args,
+            v.category,
+            v.unread,
+          ])
+        ).count,
+      ),
+    };
+  });
+  api('POST', '/notifications/read-all', async (c, a, b) => {
+    const v = z
+      .object({ category: z.enum(['ALL', 'KOC', 'OTHER']).default('ALL') })
+      .strict()
+      .parse(b);
+    await c.query(
+      `UPDATE notifications SET read_at=now() WHERE ${notificationVisibility} AND read_at IS NULL
+      AND ($4='ALL' OR ($4='KOC' AND event_key LIKE 'koc-video:%') OR ($4='OTHER' AND event_key NOT LIKE 'koc-video:%'))`,
+      [a.id, hasJob(a, 'HR'), canReadOrders(a), v.category],
+    );
+    return { ok: true };
+  });
   api('POST', '/notifications/:id/read', async (c, a, b, q, p) => {
-    await c.query('UPDATE notifications SET read_at=now() WHERE id=$1 AND user_id=$2', [
-      p.id,
-      a.id,
-    ]);
+    await c.query(
+      `UPDATE notifications SET read_at=COALESCE(read_at,now()) WHERE id=$4 AND ${notificationVisibility}`,
+      [a.id, hasJob(a, 'HR'), canReadOrders(a), p.id],
+    );
     return { ok: true };
   });
   api('GET', '/audit', async (c, a) => {
@@ -697,6 +733,7 @@ export async function buildApp() {
   hrRoutes(api);
   reportRoutes(api);
   moduleRoutes(api);
+  orderRoutes(api);
   app.get('/api/health', async () => {
     await pool.query('SELECT 1');
     return { ok: true };

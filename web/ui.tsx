@@ -407,6 +407,7 @@ export function Modal({
   return (
     <dialog
       className={compact ? 'compact-dialog' : undefined}
+      aria-label={title}
       ref={ref}
       onCancel={(e) => {
         e.preventDefault();

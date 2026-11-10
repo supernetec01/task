@@ -26,6 +26,8 @@ import { WorkTasks, CreateChecklist } from './checklist';
 import { SourceWorkspace, ResourceSettings, SourceRows, HandoffSettings } from './sources';
 import { ContentWorkspace } from './content-v2';
 import { HrWorkspace, RoleProvision } from './hr-v2';
+import { OrderWorkspace } from './orders';
+import { NotificationInbox } from './notifications';
 import './style.css';
 const names: Record<string, string> = {
   dashboard: 'Tổng quan công việc',
@@ -40,6 +42,7 @@ const names: Record<string, string> = {
   reports: 'Báo cáo',
   content: 'Nội dung & sản xuất',
   business: 'Kinh doanh',
+  orders: 'Quản lý đơn hàng',
   ads: 'Quảng cáo',
   hr: 'Nhân sự',
   warehouse: 'Kho & mẫu hàng',
@@ -62,6 +65,7 @@ function NavIcon({ name }: { name: string }) {
     accounts: 'M15 4a6 6 0 1 1-4 10L4 21H1v-3l7-7a6 6 0 0 1 7-7z M16 8h.01',
     settings:
       'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2',
+    orders: 'M3 7l9-5 9 5v12l-9 4-9-4z M3 7l9 5 9-5 M12 12v11 M7 4l10 6',
     notifications: 'M5 17h14l-2-3V9a5 5 0 0 0-10 0v5z M10 21h4',
     users: 'M12 2l9 4v6c0 5-9 10-9 10S3 17 3 12V6z M8 12l3 3 5-6',
   };
@@ -96,7 +100,21 @@ function App() {
     [filter, setFilter] = useState(''),
     [employeeFocus, setEmployeeFocus] = useState(''),
     [reportFocus, setReportFocus] = useState(''),
-    [hrTarget, setHrTarget] = useState('');
+    [hrTarget, setHrTarget] = useState(''),
+    [orderFocus, setOrderFocus] = useState(''),
+    [notificationRevision, setNotificationRevision] = useState(0);
+  const notifications = useLoad(me ? '/notifications' : null, notificationRevision);
+  useEffect(() => {
+    const refresh = () => setNotificationRevision((r) => r + 1);
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener('sn-notifications-refresh', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('sn-notifications-refresh', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
   useHourlyRefresh(() => setRevision((r) => r + 1));
   const permissionKey = useRef('');
   const [accessRevision, setAccessRevision] = useState(0);
@@ -252,8 +270,20 @@ function App() {
           </div>
           <div className="actions">
             {me.demo && <Badge>MÔI TRƯỜNG DEMO</Badge>}
-            <button className="ghost" aria-label="Thông báo" onClick={() => go('notifications')}>
+            <button
+              className="ghost notification-bell"
+              aria-label="Thông báo"
+              onClick={() => go('notifications')}
+            >
               <NavIcon name="notifications" />
+              {notifications.data?.unread_count > 0 && (
+                <span
+                  className="notification-count"
+                  aria-label={`${notifications.data.unread_count} thông báo chưa đọc`}
+                >
+                  {notifications.data.unread_count > 99 ? '99+' : notifications.data.unread_count}
+                </span>
+              )}
             </button>
             <span className="avatar">{me.name.slice(0, 1)}</span>
           </div>
@@ -311,6 +341,9 @@ function App() {
           )}{' '}
           {current === 'content' && <ContentWorkspace />}
           {current === 'business' && <SourceWorkspace />}
+          {current === 'orders' && (
+            <OrderWorkspace me={me} focus={orderFocus} onFocusHandled={() => setOrderFocus('')} />
+          )}
           {current === 'hr' && (
             <HrWorkspace
               key={hrTarget + employeeFocus}
@@ -368,9 +401,13 @@ function App() {
           )}{' '}
           {current === 'accounts' && <Accounts me={me} />}{' '}
           {current === 'notifications' && (
-            <Notifications
+            <NotificationInbox
+              revision={notificationRevision}
               onOpen={async (path: string) => {
-                if (/^\/tasks\/[0-9a-f-]{36}$/.test(path)) {
+                if (/^\/orders\/[0-9a-f-]{36}$/.test(path)) {
+                  setOrderFocus(path.split('/')[2]);
+                  go('orders');
+                } else if (/^\/tasks\/[0-9a-f-]{36}$/.test(path)) {
                   go('mine');
                   setTask(path.split('/')[2]);
                 } else if (/^\/report-revisions\/[0-9a-f-]{36}$/.test(path)) {
@@ -642,45 +679,6 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
         </div>
       </Loaded>
     </>
-  );
-}
-function Notifications({ onEmployee, onOpen }: any) {
-  const [rev, setRev] = useState(0),
-    { data, error } = useLoad('/notifications', rev);
-  useHourlyRefresh(() => setRev((r) => r + 1));
-  return (
-    <Loaded data={data} error={error}>
-      <div className="panel">
-        <button onClick={() => setRev((r) => r + 1)}>Tải lại thông báo</button>
-        {data?.items.length ? (
-          data.items.map((n: any) => (
-            <div className="notification" key={n.id}>
-              <p>{n.message}</p>
-              {n.action_path && (
-                <button onClick={() => onOpen(n.action_path)}>Mở nội dung liên quan</button>
-              )}
-              {!n.action_path && n.event_key.startsWith('contract:') && n.object_id && (
-                <button onClick={() => onEmployee(n.object_id)}>Mở hồ sơ nhân sự</button>
-              )}
-              {n.read_at ? (
-                <Badge>Đã đọc</Badge>
-              ) : (
-                <button
-                  onClick={async () => {
-                    await api('/notifications/' + n.id + '/read', {});
-                    setRev((r) => r + 1);
-                  }}
-                >
-                  Đánh dấu đã đọc
-                </button>
-              )}
-            </div>
-          ))
-        ) : (
-          <Empty>Chưa có thông báo.</Empty>
-        )}
-      </div>
-    </Loaded>
   );
 }
 createRoot(document.getElementById('root')!).render(

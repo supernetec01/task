@@ -32,9 +32,15 @@ Một người có thể có nhiều ROLE. HR chỉ cấp MARKETPLACE/HR/CONTENT
 
 Sao lưu DB và file bằng `node scripts/backup.mjs <thư-mục-backup>`, giữ cấu hình/khóa mã hóa riêng. Thử khôi phục bằng `scripts/restore.mjs` vào DB và DATA_DIR trống khác trước khi nâng cấp dữ liệu thật. Đặt `PG_BIN_DIR` nếu công cụ PostgreSQL chưa có trong PATH.
 
-Dừng API/worker, chạy `npm ci`, `npm run build`, `npm run migrate`, rồi khởi động lại. Migration mới nhất là **011.sql**: thu hồi mọi grant ngoài 5 ROLE (kể cả quyền cấp trong tương lai), BOSS không có scope ALL và grant CONTENT tự ánh xạ từ DESIGNER ở migration 008; tăng phiên bản quyền và xóa session của người bị ảnh hưởng. Không tự chuyển người sang ROLE khác. ADMIN cần xem lại tài khoản và cấp quyền có chủ đích.
+Dừng API/worker, chạy `npm ci`, `npm run build`, `npm run migrate`, rồi khởi động lại. Migration **011.sql**: thu hồi mọi grant ngoài 5 ROLE (kể cả quyền cấp trong tương lai), BOSS không có scope ALL và grant CONTENT tự ánh xạ từ DESIGNER ở migration 008; tăng phiên bản quyền và xóa session của người bị ảnh hưởng. Không tự chuyển người sang ROLE khác. ADMIN cần xem lại tài khoản và cấp quyền có chủ đích.
 
 Migration cũng thu hồi grant tài khoản theo ROLE đã bỏ, xóa ánh xạ mẫu công việc sang chuyên môn đã bỏ, tắt mẫu không còn chuyên môn hợp lệ và lịch công việc thuộc ROLE đã bỏ. Grant đã thu hồi, công việc, hồ sơ nhân viên, báo cáo và các bản ghi lịch sử được giữ lại. Các migration cũ và mẫu snapshot lịch sử được giữ để nâng cấp/đọc dữ liệu cũ; chúng không phải danh sách ROLE đang hỗ trợ.
+
+## Quản lý đơn hàng
+
+Role MARKETPLACE và ADMIN quản lý đơn khách hàng/KOC; BOSS chỉ xem và xuất báo cáo. Gồm danh mục sản phẩm/SKU, nhập Excel/CSV, theo dõi video sau ngày nhận thực tế, báo cáo tuần/tháng và thông báo KOC. Xem [thiết kế và ảnh giao diện](docs/order-management/README.md).
+
+Migration mới nhất là **012.sql**, bổ sung dữ liệu đơn hàng riêng, không liên quan tồn kho. Cần chạy cả API và worker để nhận nhắc video ở mốc 7/15 ngày. Chưa kết nối API SPX; cần file xuất thực tế để đối chiếu cách ghép cột/trạng thái.
 
 ## Kiểm thử
 
