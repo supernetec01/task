@@ -1,3 +1,4 @@
+import { employmentV2 } from './hr.js';
 import { z } from 'zod';
 import { type API } from './app.js';
 import {
@@ -110,6 +111,12 @@ export function moduleRoutes(api: API) {
     let old: any;
     if (id) {
       old = await recordAccess(c, a, id, true);
+      need(
+        !(await one(c, 'SELECT id FROM content_items WHERE id=$1', [id])),
+        'Hồ sơ mới cần cập nhật qua quy trình sản xuất',
+        409,
+        'TYPED_ROUTE_REQUIRED',
+      );
       version(old, v.expected_version);
       need(old.kind === v.kind, 'Không đổi loại hồ sơ', 422, 'VALIDATION');
     }
@@ -249,6 +256,7 @@ export function moduleRoutes(api: API) {
     return { ok: true };
   });
   api('POST', '/employees/:id/employment', async (c, a, b, q, p) => {
+    if (b.phase) return employmentV2(c, a, p.id, b);
     const e = await hrAccess(c, a, p.id, true);
     version(e, b.expected_version);
     const v = z

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { type API } from './app.js';
+import { createChecklist, checklistAction, checklistList, checklistRoutes } from './checklist.js';
+import { teamWork } from './handoff-access.js';
 import {
   type DB,
   type Actor,
@@ -30,6 +32,11 @@ export async function taskAccess(c: DB, a: Actor, id: string, lock = false) {
     [id],
   );
   need(t, 'Không tìm thấy công việc', 404, 'NOT_FOUND');
+  if (t.flow_mode === 'CHECKLIST') {
+    const owner = t.owner_id === a.id && hasJob(a, t.role);
+    need(owner || teamWork(a), 'Không tìm thấy công việc', 404, 'NOT_FOUND');
+    return { t, s: null, owner, manager: teamWork(a), support: false };
+  }
   const s = await one(c, 'SELECT * FROM supporters WHERE task_id=$1 AND user_id=$2', [id, a.id]);
   const owner = t.owner_id === a.id && hasJob(a, t.role),
     manager =
@@ -60,13 +67,19 @@ export async function taskDetail(c: DB, a: Actor, id: string) {
     capabilities: {
       owner,
       manager,
-      review: canReview,
+      review: t.flow_mode !== 'CHECKLIST' && canReview,
       comment: !!(owner || manager || (x.support && s?.status === 'ACCEPTED')),
-      update: owner && ['ACCEPTED', 'IN_PROGRESS', 'CHANGES_REQUESTED'].includes(t.status),
+      update:
+        t.flow_mode === 'CHECKLIST'
+          ? (owner || isAdmin(a)) && ['WAITING', 'IN_PROGRESS'].includes(t.status)
+          : owner && ['ACCEPTED', 'IN_PROGRESS', 'CHANGES_REQUESTED'].includes(t.status),
       cancel:
-        !['DONE', 'CANCELLED'].includes(t.status) && (manager || (owner && t.created_by === a.id)),
+        !['DONE', 'CANCELLED'].includes(t.status) &&
+        (t.flow_mode === 'CHECKLIST'
+          ? owner || isAdmin(a)
+          : manager || (owner && t.created_by === a.id)),
     },
-    template_name: taskTemplate(t).name,
+    template_name: t.flow_mode === 'CHECKLIST' ? 'Checklist' : taskTemplate(t).name,
     template_version: t.template_version,
   };
   const assets = await rows(
@@ -78,7 +91,7 @@ export async function taskDetail(c: DB, a: Actor, id: string) {
     return { ...brief, assets, pending_brief: true };
   return {
     ...t,
-    template_name: taskTemplate(t).name,
+    template_name: t.flow_mode === 'CHECKLIST' ? 'Checklist' : taskTemplate(t).name,
     updates: await rows(
       c,
       'SELECT v.*,u.name FROM task_updates v LEFT JOIN users u ON u.id=v.actor_id WHERE v.task_id=$1 ORDER BY v.created_at DESC LIMIT 100',
@@ -180,6 +193,7 @@ export function validURL(v: unknown) {
   }
 }
 export async function createTask(c: DB, a: Actor, b: any) {
+  if (b.flow_mode === 'CHECKLIST' || b.job_code) return createChecklist(c, a, b);
   const v = z
     .object({
       attachment_ids: z.array(z.uuid()).max(50).default([]),
@@ -354,10 +368,12 @@ export async function assign(c: DB, t: any) {
   );
 }
 export function taskRoutes(api: API) {
+  checklistRoutes(api);
   templateRoutes(api);
   api('GET', '/task-types', async (c, a) => availableTemplates(c, a));
   api('POST', '/tasks', createTask);
   api('GET', '/tasks', async (c, a, b, q) => {
+    if (q.v2 || q.scope || q.status_group || q.sort) return checklistList(c, a, q);
     const mode = q.mode === 'team' && management(a) ? 'team' : 'mine';
     const filterSql = `FROM tasks t JOIN users u ON u.id=t.owner_id WHERE ((t.owner_id=$1 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='JOB' AND g.role=t.role AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()))) OR EXISTS(SELECT 1 FROM supporters s JOIN grants g ON g.user_id=s.user_id AND g.role=s.role AND g.kind='JOB' WHERE s.task_id=t.id AND t.status<>'DRAFT' AND s.user_id=$1 AND s.status IN ('PENDING','ACCEPTED') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now())) OR ($2 AND EXISTS(SELECT 1 FROM grants g WHERE g.user_id=$1 AND g.kind='ACCESS' AND g.role IN ('ADMIN','BOSS','MANAGER') AND g.revoked_at IS NULL AND g.valid_from<=now() AND (g.valid_to IS NULL OR g.valid_to>now()) AND (g.scope='ALL' OR (g.scope='TEAM' AND g.team_id=u.team_id))))) AND ($3='' OR t.title ILIKE '%'||$3||'%' OR t.code::text=$3) AND ($4='' OR t.status=$4) AND ($5='' OR t.role=$5) AND ($6='' OR t.owner_id::text=$6)`;
     const filterArgs = [
@@ -453,6 +469,8 @@ export function taskRoutes(api: API) {
   });
   api('GET', '/tasks/:id', async (c, a, b, q, p) => taskDetail(c, a, p.id));
   api('PATCH', '/tasks/:id', async (c, a, b, q, p) => {
+    const check = await taskAccess(c, a, p.id, true);
+    if (check.t.flow_mode === 'CHECKLIST') return checklistAction(c, a, check.t, 'brief', b);
     const { t, owner } = await taskAccess(c, a, p.id, true);
     need(owner);
     version(t, b.expected_version);
@@ -729,6 +747,7 @@ export function taskRoutes(api: API) {
   });
   api('POST', '/tasks/:id/cancel', async (c, a, b, q, p) => {
     const { t, owner, manager } = await taskAccess(c, a, p.id, true);
+    if (t.flow_mode === 'CHECKLIST') return checklistAction(c, a, t, 'cancel', b);
     need(manager || (owner && t.created_by === a.id));
     version(t, b.expected_version);
     need(!['DONE', 'CANCELLED'].includes(t.status), 'Đã đóng', 409, 'STATE');
@@ -746,6 +765,7 @@ export function taskRoutes(api: API) {
   });
   api('POST', '/tasks/:id/transfer', async (c, a, b, q, p) => {
     const { t, manager } = await taskAccess(c, a, p.id, true);
+    if (t.flow_mode === 'CHECKLIST') return checklistAction(c, a, t, 'transfer', b);
     need(manager);
     version(t, b.expected_version);
     need(
@@ -788,6 +808,7 @@ export function taskRoutes(api: API) {
   });
   api('POST', '/tasks/:id/reopen', async (c, a, b, q, p) => {
     const { t, manager } = await taskAccess(c, a, p.id, true);
+    if (t.flow_mode === 'CHECKLIST') return checklistAction(c, a, t, 'reopen', b);
     need(manager && t.reviewer_id === a.id);
     version(t, b.expected_version);
     need((await setting(c, 'policies')).reopen_enabled, 'Chưa chốt Q14', 422, 'CONFIG_REQUIRED');

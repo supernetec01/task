@@ -1,0 +1,46 @@
+erDiagram
+  candidate_profiles {
+    uuid id PK
+    date birthday
+  }
+  job_applications {
+    uuid id PK
+    uuid candidate_id FK
+    text stage
+  }
+  interview_sessions {
+    uuid id PK
+    uuid application_id FK
+  }
+  candidate_employee_links {
+    uuid application_id PK
+    uuid employee_id FK
+  }
+  employee_profiles {
+    uuid id PK
+    uuid user_id FK
+    text employee_code
+  }
+  employee_contracts {
+    uuid id PK
+    uuid employee_id FK
+    uuid current_revision_id FK
+  }
+  employee_contract_revisions {
+    uuid id PK
+    uuid contract_id FK
+    date expires_on
+  }
+  employee_salary_terms {
+    uuid id PK
+    uuid employee_id FK
+    date effective_from
+    text encrypted_payload
+  }
+  candidate_profiles ||--o{ job_applications : "ứng tuyển"
+  job_applications ||--o{ interview_sessions : "phỏng vấn"
+  job_applications ||--o| candidate_employee_links : "nhận việc"
+  employee_profiles ||--o| candidate_employee_links : "liên kết"
+  employee_profiles ||--o{ employee_contracts : "hợp đồng"
+  employee_contracts ||--o{ employee_contract_revisions : "bản ký / điều chỉnh"
+  employee_profiles ||--o{ employee_salary_terms : "mốc lương"

@@ -2264,7 +2264,7 @@ test('HR profile · private photo and tax/insurance/bank fields stay scoped and 
   assert(!stored.includes(sensitive.bank_account));
   assert.equal((await request('employee', 'GET', '/employees/' + e.id + '/sensitive')).status, 403);
 });
-test('HR05/PWD05..07 · gated leave invalidates actual sessions/grants, preserves histories, no generic usage collection', async () => {
+test('HR05/PWD05..07 · confirmed leave invalidates actual sessions/grants, preserves histories, no generic usage collection', async () => {
   const login = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/login',
@@ -2284,7 +2284,15 @@ test('HR05/PWD05..07 · gated leave invalidates actual sessions/grants, preserve
     confirm_disable: true,
     expected_version: e.version,
   };
-  assert.equal((await request('admin', 'POST', '/employees/' + e.id + '/leave', body)).status, 422);
+  assert.equal(
+    (
+      await request('admin', 'POST', '/employees/' + e.id + '/leave', {
+        ...body,
+        confirm_disable: false,
+      })
+    ).status,
+    422,
+  );
   assert.equal(
     (
       await request('admin', 'POST', '/employees/' + e.id + '/employment', {
@@ -2461,12 +2469,23 @@ test('Approved privacy · HR payroll only; management is not executive; explicit
     403,
   );
   const perm = await ok('reviewLeader', 'GET', '/me');
-  await ok('admin', 'POST', '/users/' + ids.reviewLeader + '/grants', {
-    expected_permission_version: perm.permission_version,
-    job_grants: [],
-    access_grant: { role: 'EXECUTIVE', scope: 'ALL' },
-    reason: 'Cấp Ban lãnh đạo rõ ràng để QC',
-  });
+  assert.equal(
+    (
+      await request('admin', 'POST', '/users/' + ids.reviewLeader + '/grants', {
+        expected_permission_version: perm.permission_version,
+        job_grants: [],
+        access_grant: { role: 'EXECUTIVE', scope: 'ALL' },
+        reason: 'Cấp Ban lãnh đạo rõ ràng để QC',
+      })
+    ).status,
+    422,
+  );
+  // Synthetic historical grant: HANDOFF forbids issuing new EXECUTIVE grants,
+  // while this regression must still exercise retained legacy access.
+  await pool.query(
+    "INSERT INTO grants(user_id,kind,role,scope,reason) VALUES($1,'ACCESS','EXECUTIVE','ALL','SYNTHETIC legacy grant predating HANDOFF')",
+    [ids.reviewLeader],
+  );
   assert.equal(
     (await ok('reviewLeader', 'GET', '/employees/' + e.id + '/sensitive')).data.tax_id,
     'TAX-PRIVATE',

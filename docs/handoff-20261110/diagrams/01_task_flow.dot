@@ -1,0 +1,29 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.45,ranksep=0.5];
+node [shape=box,style="rounded,filled",fillcolor="#edf3e8",color="#b9cdb5",fontname="DejaVu Sans",fontsize=12,margin="0.15,0.12"];
+edge [color="#57745d",fontname="DejaVu Sans",fontsize=10];
+A [label="Người dùng tạo hoặc Sếp giao",shape=box];
+P [label="Quyền và dữ liệu hợp lệ?",shape=diamond];
+W [label="CHECKLIST: Chưa thực hiện",shape=box];
+I [label="Đang thực hiện",shape=box];
+D [label="Hoàn thành + kết quả",shape=box];
+C [label="Đã hủy + lý do",shape=box];
+R [label="Admin mở lại + lý do",shape=box];
+E [label="State + event cùng transaction",shape=box];
+L [label="LEGACY_REVIEW giữ luồng duyệt cũ",shape=box];
+X [label="Báo lỗi; giữ nội dung",shape=box];
+A -> P;
+P -> X [label="Không"];
+P -> W [label="Có, task mới"];
+W -> I [label="Bắt đầu"];
+W -> D [label="Đã làm ngoài hệ thống"];
+I -> D [label="Kết quả hợp lệ"];
+W -> C [label="Hủy"];
+I -> C [label="Hủy"];
+D -> R [label="Cần mở lại"];
+C -> R [label="Cần mở lại"];
+R -> I;
+D -> E;
+C -> E;
+L -> E [label="Không đổi dữ liệu cũ"];
+}

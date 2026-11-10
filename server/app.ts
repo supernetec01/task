@@ -43,6 +43,13 @@ import {
   userAccessRoutes,
 } from './user-access.js';
 import { capabilities } from './capabilities.js';
+import { resourceRoutes, displayRoles } from './handoff-access.js';
+import { roleBundleRoutes, provisionUser } from './role-bundles.js';
+import { contentRoutes } from './content.js';
+import { contentAccess, publicationAccess } from './content.js';
+import { sourceBatch } from './source-imports.js';
+import { hrRoutes } from './hr.js';
+import { videoWindowRoutes } from './video-window.js';
 import { logStream } from './logging.js';
 export type Handler = (
   c: DB,
@@ -165,6 +172,7 @@ export async function buildApp() {
             ? e.fields
             : undefined,
       request_id: req.id,
+      current_version: e.code === 'VERSION_CONFLICT' ? e.current_version : undefined,
       retryable: status >= 500 || status === 429,
     });
   });
@@ -253,9 +261,25 @@ export async function buildApp() {
             [hash(req.cookies.sn_session || '')],
           );
           need(session, 'Vui lòng đăng nhập', 401, 'UNAUTHORIZED');
+          const mutation = !['GET', 'HEAD'].includes(method);
+          if (mutation)
+            await c.query('SELECT id FROM users WHERE id=$1 FOR SHARE', [session.user_id]);
           const a = await actor(c, session.user_id);
           a.csrf = session.csrf;
-          const mutation = !['GET', 'HEAD'].includes(method);
+          if (mutation && path.startsWith('/tasks/:id/')) {
+            const t = await one(c, 'SELECT flow_mode FROM tasks WHERE id=$1', [
+              (req.params as any).id,
+            ]);
+            if (t?.flow_mode === 'CHECKLIST')
+              need(
+                ['state', 'cancel', 'reopen', 'transfer', 'deadline', 'comments'].includes(
+                  path.split('/').at(-1)!,
+                ),
+                'Công việc checklist không dùng quy trình duyệt cũ',
+                422,
+                'FLOW_MODE',
+              );
+          }
           if (mutation) {
             await c.query('SELECT pg_advisory_xact_lock_shared(3002003)');
             need(
@@ -315,6 +339,11 @@ export async function buildApp() {
                   'SELECT id,account_id,role,valid_to FROM account_grants WHERE user_id=$1 AND revoked_at IS NULL AND (valid_to IS NULL OR valid_to>now()) ORDER BY id',
                   [a.id],
                 ),
+                await rows(
+                  c,
+                  'SELECT id,resource_id,permission FROM resource_grants WHERE user_id=$1 AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now()) ORDER BY id',
+                  [a.id],
+                ),
               ]),
             );
             payloadHash = hash(method + path + JSON.stringify(req.params) + JSON.stringify(b));
@@ -346,6 +375,9 @@ export async function buildApp() {
                 if (path.endsWith('/sensitive')) need(await sensitiveAllowed(c, a, employee));
               }
               if (path.startsWith('/tasks/:id')) await taskAccess(c, a, params.id);
+              if (path.startsWith('/content-items/:id')) await contentAccess(c, a, params.id);
+              if (path.startsWith('/publications/:id')) await publicationAccess(c, a, params.id);
+              if (path.startsWith('/imports/:id')) await sourceBatch(c, a, params.id, true);
               return old.response;
             }
           }
@@ -366,6 +398,7 @@ export async function buildApp() {
     });
   api('GET', '/me', async (c, a) => ({
     ...a,
+    display_roles: displayRoles(a),
     admin: isAdmin(a),
     management: management(a),
     capabilities: await capabilities(c, a),
@@ -461,7 +494,9 @@ export async function buildApp() {
     await audit(c, a, 'TEAM_CREATED', 'team', t.id);
     return t;
   });
-  api('POST', '/users', async (c, a, b) => createUserWithAccess(c, a, b));
+  api('POST', '/users', async (c, a, b) =>
+    b.display_roles ? provisionUser(c, a, b) : createUserWithAccess(c, a, b),
+  );
   userAccessRoutes(api);
   api('PATCH', '/users/:id', async (c, a, b, q, p) => {
     need(isAdmin(a));
@@ -534,6 +569,40 @@ export async function buildApp() {
   });
   api('PUT', '/settings/:key', async (c, a, b, q, p) => {
     need(isAdmin(a));
+    if (p.key === 'handoff_policies') {
+      const old = await one(c, "SELECT * FROM settings WHERE key='handoff_policies' FOR UPDATE");
+      version(old, b.expected_version);
+      need(
+        typeof b.reason === 'string' && b.reason.trim(),
+        'Cần lý do thay đổi cấu hình',
+        422,
+        'VALIDATION',
+      );
+      const value = z
+        .object({
+          timezone: z.literal('Asia/Ho_Chi_Minh'),
+          report_due_hour: z.number().int().min(0).max(23),
+          report_due_minute: z.number().int().min(0).max(59).default(0),
+          probation_offsets: z.array(z.number().int().min(0).max(365)).min(1).max(12),
+          contract_offsets: z.array(z.number().int().min(0).max(365)).min(1).max(12),
+          birthday_offsets: z.number().int().min(0).max(30),
+          hr_reminders_enabled: z.boolean().default(true),
+          birthday_month_enabled: z.boolean().default(true),
+          birthday_soon_enabled: z.boolean().default(true),
+          version: z.number().int().positive(),
+        })
+        .strict()
+        .parse({ ...old.value, ...b.value, version: old.version + 1 });
+      await c.query(
+        "UPDATE settings SET value=$1,version=version+1,updated_by=$2,updated_at=now() WHERE key='handoff_policies'",
+        [JSON.stringify(value), a.id],
+      );
+      await c.query(
+        "INSERT INTO settings_history(key,value,reason,actor_id) VALUES('handoff_policies',$1,$2,$3)",
+        [JSON.stringify(value), b.reason, a.id],
+      );
+      return { ok: true, version: old.version + 1 };
+    }
     need(['calendar', 'policies'].includes(p.key), 'Cấu hình không hợp lệ', 422, 'VALIDATION');
     const old = await one(c, 'SELECT * FROM settings WHERE key=$1 FOR UPDATE', [p.key]);
     version(old, b.expected_version);
@@ -592,8 +661,17 @@ export async function buildApp() {
   api('GET', '/notifications', async (c, a) => ({
     items: await rows(
       c,
-      "SELECT * FROM notifications WHERE user_id=$1 AND ($2 OR event_key NOT LIKE 'contract:%') ORDER BY created_at DESC LIMIT 100",
+      "SELECT * FROM notifications WHERE user_id=$1 AND ($2 OR (event_key NOT LIKE 'contract:%' AND event_key NOT LIKE 'birthday:%' AND event_key NOT LIKE 'hr:%')) ORDER BY (read_at IS NOT NULL),created_at DESC,id LIMIT 100",
       [a.id, hasJob(a, 'HR')],
+    ),
+    unread_count: Number(
+      (
+        await one(
+          c,
+          "SELECT count(*) FROM notifications WHERE user_id=$1 AND read_at IS NULL AND ($2 OR (event_key NOT LIKE 'contract:%' AND event_key NOT LIKE 'birthday:%' AND event_key NOT LIKE 'hr:%'))",
+          [a.id, hasJob(a, 'HR')],
+        )
+      ).count,
     ),
   }));
   api('POST', '/notifications/:id/read', async (c, a, b, q, p) => {
@@ -612,6 +690,11 @@ export async function buildApp() {
     );
   });
   taskRoutes(api);
+  resourceRoutes(api);
+  roleBundleRoutes(api);
+  contentRoutes(api);
+  videoWindowRoutes(api);
+  hrRoutes(api);
   reportRoutes(api);
   moduleRoutes(api);
   app.get('/api/health', async () => {

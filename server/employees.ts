@@ -231,6 +231,55 @@ async function validate(c: DB, a: Actor, v: z.infer<typeof employeeSchema>, id?:
     );
   }
 }
+export async function createEmployee(c: DB, a: Actor, b: any) {
+  need(hrEdit(a));
+  const v = employeeSchema.parse(b);
+  await validate(c, a, v);
+  need(v.team_id, 'Cần chọn bộ phận khi tạo hồ sơ', 422, 'TEAM_REQUIRED');
+  need(!v.user_id || isAdmin(a), 'Chỉ Admin liên kết tài khoản đăng nhập', 403, 'FORBIDDEN');
+  const e = await one(
+    c,
+    'INSERT INTO employee_profiles(created_by,user_id,name,birthday,employee_code,joined_on,team_id,manager_id,employment_state,employment_type,probation_start,official_start,probation_end,contract_date,contract_end,contact) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *',
+    [
+      a.id,
+      v.user_id,
+      v.name,
+      v.birthday,
+      v.employee_code,
+      v.joined_on,
+      v.team_id,
+      v.manager_id,
+      v.phase,
+      v.employment_type,
+      v.phase === 'PROBATION' ? v.joined_on : null,
+      v.phase === 'OFFICIAL' ? v.joined_on : null,
+      v.probation_end,
+      v.contract_date,
+      v.contract_end,
+      JSON.stringify(v.contact),
+    ],
+  );
+  for (const p of v.positions)
+    await c.query(
+      'INSERT INTO employee_positions(employee_id,position_code,effective_from) VALUES($1,$2,$3)',
+      [e.id, p, v.joined_on],
+    );
+  await c.query(
+    "INSERT INTO employment_events(employee_id,kind,business_date,actor_id,payload) VALUES($1,'PROFILE_CREATED',$2,$3,$4)",
+    [
+      e.id,
+      v.joined_on,
+      a.id,
+      JSON.stringify({
+        positions: v.positions,
+        phase: v.phase,
+        employment_type: v.employment_type,
+      }),
+    ],
+  );
+  await employeeRevision(c, a, e.id, 'PROFILE_CREATED', null, basicSnapshot(e, v.positions));
+  return details(c, a, e);
+}
 export function employeeRoutes(api: API) {
   api('GET', '/employees/options', async (c, a) => {
     need(hrEdit(a) || isExecutive(a));
@@ -334,60 +383,19 @@ export function employeeRoutes(api: API) {
       if (b[key]) q.set(key, String(b[key]));
     return { url: '/api/v1/employees/export?' + q };
   });
-  api('POST', '/employees', async (c, a, b) => {
-    need(hrEdit(a));
-    const v = employeeSchema.parse(b);
-    await validate(c, a, v);
-    need(!v.user_id || isAdmin(a), 'Chỉ Admin liên kết tài khoản đăng nhập', 403, 'FORBIDDEN');
-    const e = await one(
-      c,
-      'INSERT INTO employee_profiles(created_by,user_id,name,birthday,employee_code,joined_on,team_id,manager_id,employment_state,employment_type,probation_start,official_start,probation_end,contract_date,contract_end,contact) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING *',
-      [
-        a.id,
-        v.user_id,
-        v.name,
-        v.birthday,
-        v.employee_code,
-        v.joined_on,
-        v.team_id,
-        v.manager_id,
-        v.phase,
-        v.employment_type,
-        v.phase === 'PROBATION' ? v.joined_on : null,
-        v.phase === 'OFFICIAL' ? v.joined_on : null,
-        v.probation_end,
-        v.contract_date,
-        v.contract_end,
-        JSON.stringify(v.contact),
-      ],
-    );
-    for (const p of v.positions)
-      await c.query(
-        'INSERT INTO employee_positions(employee_id,position_code,effective_from) VALUES($1,$2,$3)',
-        [e.id, p, v.joined_on],
-      );
-    await c.query(
-      "INSERT INTO employment_events(employee_id,kind,business_date,actor_id,payload) VALUES($1,'PROFILE_CREATED',$2,$3,$4)",
-      [
-        e.id,
-        v.joined_on,
-        a.id,
-        JSON.stringify({
-          positions: v.positions,
-          phase: v.phase,
-          employment_type: v.employment_type,
-        }),
-      ],
-    );
-    await employeeRevision(c, a, e.id, 'PROFILE_CREATED', null, basicSnapshot(e, v.positions));
-    return details(c, a, e);
-  });
+  api('POST', '/employees', createEmployee);
   api('GET', '/employees/:id', async (c, a, b, q, p) => details(c, a, await hrAccess(c, a, p.id)));
   api('PATCH', '/employees/:id', async (c, a, b, q, p) => {
     const e = await hrAccess(c, a, p.id, true);
     version(e, b.expected_version);
     need(!e.archived_at, 'Hồ sơ đã được lưu trữ', 409, 'STATE');
     const v = employeeSchema.parse(b);
+    need(
+      v.phase === e.employment_state,
+      'Chuyển giai đoạn cần thao tác công tác riêng',
+      422,
+      'EMPLOYMENT_ACTION_REQUIRED',
+    );
     await validate(c, a, v, e.id);
     need(
       e.user_id === v.user_id || (!e.user_id && isAdmin(a)),
@@ -499,18 +507,6 @@ export function employeeRoutes(api: API) {
       })
       .parse(b);
     need(
-      (await setting(c, 'policies')).employee_leave_confirmed,
-      'Cần chốt quy trình nghỉ việc và bàn giao trong Thiết lập trước khi thực hiện',
-      422,
-      'CONFIG_REQUIRED',
-    );
-    need(
-      v.left_on <= localDate(),
-      'Chưa hỗ trợ đặt lịch nghỉ việc tương lai',
-      422,
-      'POLICY_REQUIRED',
-    );
-    need(
       !e.archived_at && e.employment_state !== 'CANDIDATE',
       'Hồ sơ không thể nghỉ việc',
       409,
@@ -519,11 +515,29 @@ export function employeeRoutes(api: API) {
     need(e.user_id !== a.id, 'Không tự khóa tài khoản đang thực hiện', 422, 'VALIDATION');
     if (e.user_id && !isAdmin(a))
       need(
-        !isAdmin(await actor(c, e.user_id)),
+        !(await actor(c, e.user_id)).grants.some(
+          (g) => g.kind === 'ACCESS' && ['ADMIN', 'BOSS'].includes(g.role),
+        ),
         'Chỉ Admin được xử lý nghỉ việc cho tài khoản quản trị',
         403,
         'FORBIDDEN',
       );
+    if (v.left_on > localDate()) {
+      need(!e.archived_at, 'Hồ sơ đã nghỉ', 409, 'STATE');
+      await c.query('UPDATE employee_profiles SET left_on=$2,version=version+1 WHERE id=$1', [
+        e.id,
+        v.left_on,
+      ]);
+      await employeeRevision(
+        c,
+        a,
+        e.id,
+        'LEAVE_PLANNED',
+        basicSnapshot(e),
+        basicSnapshot({ ...e, left_on: v.left_on }),
+      );
+      return { ok: true, planned: true, account_disabled: false };
+    }
     await c.query(
       "UPDATE employee_profiles SET employment_state='LEFT',left_on=$2,archived_at=now(),version=version+1 WHERE id=$1",
       [e.id, v.left_on],
@@ -534,6 +548,10 @@ export function employeeRoutes(api: API) {
         [e.user_id],
       );
       await c.query('DELETE FROM sessions WHERE user_id=$1', [e.user_id]);
+      await c.query(
+        'UPDATE resource_grants SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL',
+        [e.user_id],
+      );
       await c.query('UPDATE grants SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [
         e.user_id,
       ]);

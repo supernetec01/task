@@ -15,6 +15,7 @@ import {
   type Field,
 } from './ui';
 import { TaskDrawer } from './task-drawer';
+import { ChecklistDetail } from './checklist';
 import { Upload, Transfer } from './task-attachments';
 export { Upload } from './task-attachments';
 
@@ -90,7 +91,18 @@ export function TaskTable({ items, onOpen }: { items: any[]; onOpen: (id: string
                   )}
                 </td>
                 <td>
-                  <Badge>{statusLabel[t.status]}</Badge>
+                  <Badge>
+                    {t.flow_mode === 'CHECKLIST'
+                      ? (
+                          {
+                            WAITING: 'Chưa thực hiện',
+                            IN_PROGRESS: 'Đang thực hiện',
+                            DONE: 'Đã hoàn thành',
+                            CANCELLED: 'Đã hủy',
+                          } as any
+                        )[t.status]
+                      : statusLabel[t.status]}
+                  </Badge>
                 </td>
               </tr>
             );
@@ -562,6 +574,8 @@ export function TaskDetail({
     CONTRIBUTION: 'Cập nhật phần hỗ trợ',
     COMMENT_POSTED: 'Gửi trao đổi',
   };
+  if (t?.flow_mode === 'CHECKLIST')
+    return <ChecklistDetail t={t} me={me} onClose={onClose} onChanged={onChanged} />;
   return (
     <>
       <TaskDrawer
@@ -571,7 +585,18 @@ export function TaskDetail({
         meta={
           t && (
             <div className="drawer-meta">
-              <Badge>{statusLabel[t.status]}</Badge>
+              <Badge>
+                {t.flow_mode === 'CHECKLIST'
+                  ? (
+                      {
+                        WAITING: 'Chưa thực hiện',
+                        IN_PROGRESS: 'Đang thực hiện',
+                        DONE: 'Đã hoàn thành',
+                        CANCELLED: 'Đã hủy',
+                      } as any
+                    )[t.status]
+                  : statusLabel[t.status]}
+              </Badge>
               <span>{t.owner_name}</span>
               <span>{fmt(t.due_at)}</span>
               <span>

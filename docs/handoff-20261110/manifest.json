@@ -1,0 +1,374 @@
+{
+  "package_version": "HANDOFF-1.0",
+  "created_on": "2026-11-10",
+  "baseline_commit": "217671e39b85221f5653e24c86640400ede074db",
+  "approved_prototype_library_id": "libfile_ab3468a6da3c8191b65e2381edd4aab5",
+  "approved_prototype_version": 0,
+  "files": [
+    {
+      "path": "00_READ_FIRST.md",
+      "bytes": 3946,
+      "sha256": "e7d2f49731a4c95973aa01fd4360d488441476e2229844f76cd5037d08333fa7"
+    },
+    {
+      "path": "01_CODEX_EXECUTION_CONTRACT.md",
+      "bytes": 4690,
+      "sha256": "30c0d37317d1d9656f12ad048e35f020531d88f05dcdae39e61a3f71b1c882f7"
+    },
+    {
+      "path": "02_DECISIONS.md",
+      "bytes": 5686,
+      "sha256": "9c9e85604cece502173edf4dd31aad351065b9136a76bfe0c31b6df444880473"
+    },
+    {
+      "path": "03_PERMISSIONS.md",
+      "bytes": 5308,
+      "sha256": "7dca4ebcb34d0ddfa6584b6ce4f329294097cdb89684a937b4ecd83cd1cdf006"
+    },
+    {
+      "path": "04_TASK_FILTER_SORT.md",
+      "bytes": 7173,
+      "sha256": "702f5a0d59cf9a4c4fc2d070666e4ec20e34132f7612c8063f516e520001ce3f"
+    },
+    {
+      "path": "05_SCREEN_SPEC.md",
+      "bytes": 35955,
+      "sha256": "b3e072a4b4077e131f6fc2fc3859b76169761a069179ddcda3dcf836cb9d4b1d"
+    },
+    {
+      "path": "06_IMPORTS_AND_METRICS.md",
+      "bytes": 7852,
+      "sha256": "23184236896ecb7cd402a9321973df733313baabee4975fed8f779dc2125812b"
+    },
+    {
+      "path": "07_CONTENT_VIDEO.md",
+      "bytes": 4637,
+      "sha256": "4df77ee74cee00330715cc9d080b116e549bcca65edd10983cc6a713f242446f"
+    },
+    {
+      "path": "08_HR.md",
+      "bytes": 6244,
+      "sha256": "b3a69b686c521c47e3b6ef51c00b7c46e4f62dd16b9e7ac16d4aa7416235ceb9"
+    },
+    {
+      "path": "09_REPORTS_NOTIFICATIONS.md",
+      "bytes": 4361,
+      "sha256": "054783f173d889039ff64dc5116b3f01e6addd1580c225a107ebd7276dff6752"
+    },
+    {
+      "path": "10_DATABASE.md",
+      "bytes": 27689,
+      "sha256": "46cc48b823e41669241fbb8c9369e3ff3014e039568728bf043115b645e66c68"
+    },
+    {
+      "path": "11_API.md",
+      "bytes": 4348,
+      "sha256": "10430f93123c9f3361df67c74763c5d54e39df4e60dd47bdb6bf98d8662c603c"
+    },
+    {
+      "path": "12_MIGRATION_AND_DELIVERY.md",
+      "bytes": 5020,
+      "sha256": "15d27b9b65b87720acdcebd947577e28dc84b7d7144d5d6833ac90f90e6a597d"
+    },
+    {
+      "path": "13_ACCEPTANCE.md",
+      "bytes": 15811,
+      "sha256": "04f2a72252a57fab588341802d99c8fcd6e778caa21c78d093e21fb5a0210b7f"
+    },
+    {
+      "path": "14_GAPS_AND_PROVENANCE.md",
+      "bytes": 3814,
+      "sha256": "7d917e617a476daa97cbbed8c7f72ed37f579161b9a5329c771c306a789d337c"
+    },
+    {
+      "path": "CODEX_PROMPT.txt",
+      "bytes": 1919,
+      "sha256": "733771ddde9867cd10c5b660d31443fee546679ecda21fd628afae55dece0b36"
+    },
+    {
+      "path": "START_HERE.html",
+      "bytes": 183177,
+      "sha256": "29a6728e09cbc1bd62ee0d7305a860285e71c9a2c34ae4b825219b395416f5a8"
+    },
+    {
+      "path": "VALIDATION_REPORT.md",
+      "bytes": 869,
+      "sha256": "c22e1495ba703393dd730be63f9d091366eef5f27261c8968facb0bcf1138649"
+    },
+    {
+      "path": "acceptance.csv",
+      "bytes": 11318,
+      "sha256": "b25bfc0cecae641065d49932d1c1dc45b55c692c1c9d215b861cfba22d39f2be"
+    },
+    {
+      "path": "contracts/acceptance.json",
+      "bytes": 23356,
+      "sha256": "3dce71f868c95c9cf90ee88f40420e62a0b0349df7d5a7965c2b5999e10f4907"
+    },
+    {
+      "path": "contracts/api_contract.json",
+      "bytes": 20852,
+      "sha256": "586c333132347444d84f550928b8e64f20c225e9846e841c50a5d2d206a819ae"
+    },
+    {
+      "path": "contracts/import_adapters.json",
+      "bytes": 9707,
+      "sha256": "64f43f7d54c9dd6b6cb36d1a3e275bf98a9f5d4a36edf79beed8d37bd63de667"
+    },
+    {
+      "path": "contracts/payload_examples.json",
+      "bytes": 2851,
+      "sha256": "c8acbff2ec5c87987651f5dbf0fe029bdecba013a6abd08338916d287622cb63"
+    },
+    {
+      "path": "contracts/request_schemas.json",
+      "bytes": 5635,
+      "sha256": "760f21b8245323927b0669903ba6333c8f78ba1be2954200396827652198d9f7"
+    },
+    {
+      "path": "contracts/task_sort_reference.mjs",
+      "bytes": 1478,
+      "sha256": "f22fc91695b3a027419c8686ecfa41548850bc47be79301d26b13c24ff9aa851"
+    },
+    {
+      "path": "diagrams/01_task_flow.dot",
+      "bytes": 1184,
+      "sha256": "e3f9a95aa0ca71a620bc5649322ec7b385e08c301726b1961e8f5f6d4d8d4164"
+    },
+    {
+      "path": "diagrams/01_task_flow.mmd",
+      "bytes": 718,
+      "sha256": "0ec6b756d9d7d0647acd37f716a96d1ed97bb44852786bcfc3e0b4931c3bb364"
+    },
+    {
+      "path": "diagrams/01_task_flow.svg",
+      "bytes": 11300,
+      "sha256": "0c15fc00f2cb16766f091994d9726d910a4bee5650c0cbca875db0b3a1e67ece"
+    },
+    {
+      "path": "diagrams/02_import_flow.dot",
+      "bytes": 1266,
+      "sha256": "98f879d2bd5d03f49e3a15affaae43fb0ebcfd87989172e8a64f9d08e0dc54c3"
+    },
+    {
+      "path": "diagrams/02_import_flow.mmd",
+      "bytes": 780,
+      "sha256": "2bccfe58b189e0c8800d53d2c95e30589da262b9b78d24e18964fb514246fbbb"
+    },
+    {
+      "path": "diagrams/02_import_flow.svg",
+      "bytes": 11437,
+      "sha256": "e603264d3dc1f52847092fb852c680cde9cd487d171a3fdca5acae8ac32697c4"
+    },
+    {
+      "path": "diagrams/03_content_flow.dot",
+      "bytes": 1096,
+      "sha256": "b79dd57c9001b4bbd5ca88a3647014d5e8c445c74b5bc3b1f7d5050f2efe6cfd"
+    },
+    {
+      "path": "diagrams/03_content_flow.mmd",
+      "bytes": 653,
+      "sha256": "9dc9e401113a28d198b84c8bf10c5fa4284726fa80033a4df14e2bc0b12615a5"
+    },
+    {
+      "path": "diagrams/03_content_flow.svg",
+      "bytes": 9163,
+      "sha256": "68f816f73d822b62570b1a68bfcec57452d1f480d3828ecf2d2d67d35cbfacc8"
+    },
+    {
+      "path": "diagrams/04_hr_onboard_flow.dot",
+      "bytes": 970,
+      "sha256": "33cd72f8bf274336e43de28898eb9aaefc5db049b448f95ba6994b8d9cb325b1"
+    },
+    {
+      "path": "diagrams/04_hr_onboard_flow.mmd",
+      "bytes": 550,
+      "sha256": "571f8526cec5507284a34ae6ebb98fbc514d471cf12d9b6ea67587b9bac589b9"
+    },
+    {
+      "path": "diagrams/04_hr_onboard_flow.svg",
+      "bytes": 7715,
+      "sha256": "2387fde75d8d4252c767793cc815a5b05a894932e49813a041d2381eef255db5"
+    },
+    {
+      "path": "diagrams/05_report_flow.dot",
+      "bytes": 1053,
+      "sha256": "cab2677e1ab3cac4e0b6f34b48df2f9cdd79e022b6b4fc5a0f2256a22bd09dee"
+    },
+    {
+      "path": "diagrams/05_report_flow.mmd",
+      "bytes": 617,
+      "sha256": "609b5d418fa2444a0e205fd77a78126182759bb4d9379dbaa98888e9d73c8ee8"
+    },
+    {
+      "path": "diagrams/05_report_flow.svg",
+      "bytes": 8434,
+      "sha256": "c105b5ebc39048737f7983da7077bdc25375956460ed6d618b36ac481b2489a1"
+    },
+    {
+      "path": "diagrams/06_hr_reminder_flow.dot",
+      "bytes": 810,
+      "sha256": "65fd8059102759de46feab6687fac387b58fb46b6d048484344235be500c4c86"
+    },
+    {
+      "path": "diagrams/06_hr_reminder_flow.mmd",
+      "bytes": 432,
+      "sha256": "31cf1bfceb6d130380b23427cdaab882abf2467ad616ab671a3eb5283ca08c6b"
+    },
+    {
+      "path": "diagrams/06_hr_reminder_flow.svg",
+      "bytes": 6049,
+      "sha256": "6bc35aa58a248d11dff349fb5885061b1e21c248e1d1fdcb23eb249738555083"
+    },
+    {
+      "path": "diagrams/07_er_identity_tasks.dot",
+      "bytes": 1017,
+      "sha256": "4028111f36d122647a8057da5cb76cfeaa5befb431875ce2b6be31c5c5b4c310"
+    },
+    {
+      "path": "diagrams/07_er_identity_tasks.mmd",
+      "bytes": 716,
+      "sha256": "62d448de09fb42901a64a6e5ea19be135b39c2766655e0d6fdd346a2d5c7b734"
+    },
+    {
+      "path": "diagrams/07_er_identity_tasks.svg",
+      "bytes": 7762,
+      "sha256": "2f345558212ce0566aef867a6e960909645195554138e30743f91a9c3587540d"
+    },
+    {
+      "path": "diagrams/08_er_sources.dot",
+      "bytes": 1718,
+      "sha256": "71dcc763a699033dc48d61fda980296394234bba3797dc46fde2fc686cb33a1f"
+    },
+    {
+      "path": "diagrams/08_er_sources.mmd",
+      "bytes": 1312,
+      "sha256": "2c9952b31303bb7b0d7f4b0ca9f9a21f441a9a3d95ebc811bf8653a9b44fc853"
+    },
+    {
+      "path": "diagrams/08_er_sources.svg",
+      "bytes": 12197,
+      "sha256": "651df437976f3ebf402462a5a8254f96456f972caa858f7b6b5bddffe5f7891d"
+    },
+    {
+      "path": "diagrams/09_er_content.dot",
+      "bytes": 1365,
+      "sha256": "4f4828c5f18717da3a44c28da9e5e0238b7337b513d87e5c8b54ba31a6cc0406"
+    },
+    {
+      "path": "diagrams/09_er_content.mmd",
+      "bytes": 1005,
+      "sha256": "479c1e57b4e5e1c80dacb4024217bfaf1e728098b5a2e66ebf92a08a5f9bc7a3"
+    },
+    {
+      "path": "diagrams/09_er_content.svg",
+      "bytes": 9559,
+      "sha256": "904b22a2a50e150d40a7869c47006f4bfe8a149d695a0e309bd63274ba3209e7"
+    },
+    {
+      "path": "diagrams/10_er_hr.dot",
+      "bytes": 1609,
+      "sha256": "55a6a961eb35d60dab810b94742527fe703a4f7ff0a52e260eb3cd3d358eaccb"
+    },
+    {
+      "path": "diagrams/10_er_hr.mmd",
+      "bytes": 1182,
+      "sha256": "50507340c92077ce773bd2a8efd1c4b046191de75f09d897055f2ceb879a23da"
+    },
+    {
+      "path": "diagrams/10_er_hr.svg",
+      "bytes": 10523,
+      "sha256": "48034152728f24d03af96a80156dc276d1cbee1e6878e6d1922652c4f78dce09"
+    },
+    {
+      "path": "diagrams/READ_ME.md",
+      "bytes": 692,
+      "sha256": "bc434996b98f8cf293459d745c74aa3af823d4c7d2b65672046d8c899cda16ad"
+    },
+    {
+      "path": "diagrams/index.json",
+      "bytes": 1121,
+      "sha256": "e4f8e0ceb9faf6f03443a180dc3e2a10a72dd42de3ff5f2cddadcb8e734bbfff"
+    },
+    {
+      "path": "enhancements/任務篩選_Bo_loc_va_sap_xep_task_20261110.html",
+      "bytes": 6442,
+      "sha256": "bae7236983ea9bfc8eca95acb2ccf4eea1f16a43ecd082a8160301f1462bb626"
+    },
+    {
+      "path": "fixtures/originals/Shopee銷售報表_Bao_cao_ban_hang_Shopee_20261102-20261108.xlsx",
+      "bytes": 4371,
+      "sha256": "96fc8fc22b2bd4a4361868317d9b27f305c0b6086a3e3f7768a3c5c507f752d8"
+    },
+    {
+      "path": "fixtures/originals/TikTok影片成效報表_Bao_cao_hieu_qua_video_TikTok_20261102-20261108.xlsx",
+      "bytes": 23588,
+      "sha256": "66b485726e8bbecfbe91d39510c5ca292d8e16d797849600bf8e96a53c5e5aa4"
+    },
+    {
+      "path": "fixtures/originals/TikTok退貨取消報表_Bao_cao_hoan_huy_TikTok_20261102-20261108.xlsx",
+      "bytes": 52805,
+      "sha256": "dfa04d153d741150143943f86f126e63f571f96781cda96922b9e85a717306ea"
+    },
+    {
+      "path": "fixtures/originals/TikTok達人銷售報表_Bao_cao_doanh_so_KOC_TikTok_20261102-20261108.xlsx",
+      "bytes": 111645,
+      "sha256": "30a29fc3cb0a16685e0d1f35702c9f9c13f41ff90601b499a7405742df21d1d6"
+    },
+    {
+      "path": "fixtures/originals/TikTok銷售報表_Bao_cao_ban_hang_TikTok_20261102-20261108.xlsx",
+      "bytes": 4372,
+      "sha256": "6122d93c6b36b4bf552439539780db38a99cf3a4f8ac9ca3c261b89235b07545"
+    },
+    {
+      "path": "fixtures/source_manifest.json",
+      "bytes": 2875,
+      "sha256": "b053572477a1996646d3efe77fb81dc03677b5e8c1f3a8cec182ec8b7986e72a"
+    },
+    {
+      "path": "fixtures/synthetic/task_sort.json",
+      "bytes": 1642,
+      "sha256": "bd42b06fc525f1401bb0617956acd1c188a37bbaad0c402c07e9994a796ca0be"
+    },
+    {
+      "path": "package_checks.json",
+      "bytes": 308,
+      "sha256": "c764625f384df7e9c6747eb2769f92f830b561c4e42d1a3914c8406c0521a2cb"
+    },
+    {
+      "path": "prototype/五角色介面_Giao_dien_5_ROLE_SuperNet_20261110.html",
+      "bytes": 155023,
+      "sha256": "95536458036c01d5f4081e175885f47473728bf16d949993bf00b49fe9dd5155"
+    },
+    {
+      "path": "schema/NEW_TABLES_REFERENCE.sql",
+      "bytes": 20244,
+      "sha256": "9d6b5a2905af6a3aa3169959a62562c439fa802f630721af3d7fa867859a7ebc"
+    },
+    {
+      "path": "schema/TASK_CONSTRAINT_REFERENCE.sql",
+      "bytes": 1877,
+      "sha256": "490d19d35b09065266a76d909c3493eaf76dc6e06dc853984557c2d699e85085"
+    },
+    {
+      "path": "schema/data_dictionary.json",
+      "bytes": 55967,
+      "sha256": "4e3108da4fe11bbdc64c6e16c43de6fbb15f8747175896386f1f976afed49803"
+    },
+    {
+      "path": "schema/model.dbml",
+      "bytes": 10494,
+      "sha256": "1a8a8116717c3bd21ddd72f0363abd768112c032216e8c96a1c60a261fb67318"
+    },
+    {
+      "path": "schema/relationships.json",
+      "bytes": 10938,
+      "sha256": "195c13dc1ff1160d8fb2f2dc211b05aed205f07c39ea82ac5a6614f0c2ccb8ee"
+    },
+    {
+      "path": "verify_sort.mjs",
+      "bytes": 514,
+      "sha256": "d07c6a7c57af14297c9db412bb94d96025118f28bbb80c6b2a8cfb0dce1dfe34"
+    }
+  ]
+}

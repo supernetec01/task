@@ -6,6 +6,14 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { type API } from './app.js';
 import {
+  uploadSource,
+  sourceBatch,
+  previewSource,
+  commitSource,
+  sourceHistory,
+  sourceSummaryRoutes,
+} from './source-imports.js';
+import {
   type Actor,
   type DB,
   one,
@@ -101,6 +109,8 @@ function writer(a: Actor, kind: string) {
   return role;
 }
 async function batchAccess(c: DB, a: Actor, id: string, lock = false) {
+  const v2 = await one(c, 'SELECT adapter_code FROM metric_batches WHERE id=$1', [id]);
+  if (v2?.adapter_code) return sourceBatch(c, a, id, lock);
   const v = await one(c, 'SELECT * FROM metric_batches WHERE id=$1' + (lock ? ' FOR UPDATE' : ''), [
     id,
   ]);
@@ -181,6 +191,7 @@ async function insertMetric(
   );
 }
 export function metricRoutes(api: API) {
+  sourceSummaryRoutes(api);
   api('GET', '/metric-definitions', async () => ({ definitions: metricDefinitions }));
   api('POST', '/metrics', async (c, a, b) => {
     const role = writer(a, b.kind);
@@ -207,6 +218,7 @@ export function metricRoutes(api: API) {
     };
   });
   api('POST', '/imports', async (c, a, b) => {
+    if (b.fields?.adapter_code) return uploadSource(c, a, b);
     const f = b.fields || {},
       v = z
         .object({
@@ -285,6 +297,7 @@ export function metricRoutes(api: API) {
     return r;
   });
   api('GET', '/imports', async (c, a, b, q) => {
+    if (q.v2 || q.adapter_code) return sourceHistory(c, a, q);
     writer(a, q.kind || 'SALES');
     return {
       items: await rows(
@@ -310,10 +323,24 @@ export function metricRoutes(api: API) {
   });
   api('GET', '/imports/:id', async (c, a, b, q, p) => {
     const v = await batchAccess(c, a, p.id);
+    if (v.adapter_code)
+      return {
+        ...v,
+        raw: undefined,
+        preview: v.preview
+          ? {
+              ...v.preview,
+              facts: undefined,
+              binding: undefined,
+              preview_rows: v.preview.facts?.slice(0, 5),
+            }
+          : null,
+      };
     return { ...v, raw: v.raw.map((s: any) => ({ ...s, rows: s.rows.slice(0, 30) })) };
   });
   api('POST', '/imports/:id/preview', async (c, a, b, q, p) => {
     const batch = await batchAccess(c, a, p.id, true);
+    if (batch.adapter_code) return previewSource(c, a, batch, b);
     version(batch, b.expected_version);
     need(batch.status !== 'COMMITTED', 'Nguồn đã commit', 409, 'STATE');
     const v = z
@@ -400,6 +427,8 @@ export function metricRoutes(api: API) {
     return { ...preview, preview_hash, version: batch.version + 1 };
   });
   api('POST', '/imports/:id/commit', async (c, a, b, q, p) => {
+    const v2 = await one(c, 'SELECT adapter_code FROM metric_batches WHERE id=$1', [p.id]);
+    if (v2?.adapter_code) return commitSource(c, a, await sourceBatch(c, a, p.id, true), b);
     const batch = await batchAccess(c, a, p.id, true);
     version(batch, b.expected_version);
     need(

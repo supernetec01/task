@@ -1,0 +1,21 @@
+flowchart TD
+  S["Kịch bản: lời thoại + người viết"]
+  G1{"Hoàn tất kịch bản?"}
+  Q["Chờ quay: lịch / nơi / người tham gia"]
+  G2{"Quay thực tế + tư liệu đủ?"}
+  D["Chờ dựng: người dựng + đầu ra"]
+  G3{"Clip hoàn chỉnh hợp lệ?"}
+  C["CLIP_READY; ghi event hoàn tất dựng"]
+  P["Tạo từng lượt đăng: kênh / link / giờ"]
+  V["Snapshot hiệu quả; kiểm nguồn D7"]
+  S --> G1
+  G1 -->|"Chưa đủ"| S
+  G1 -->|"Đủ"| Q
+  Q --> G2
+  G2 -->|"Chưa đủ"| Q
+  G2 -->|"Đủ"| D
+  D --> G3
+  G3 -->|"Chưa đủ"| D
+  G3 -->|"Đủ"| C
+  C -->|"0..N lượt đăng"| P
+  P --> V

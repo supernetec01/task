@@ -1,0 +1,52 @@
+[
+  {
+    "name": "01_task_flow",
+    "title": "Luồng task checklist và legacy",
+    "type": "flow"
+  },
+  {
+    "name": "02_import_flow",
+    "title": "Luồng tải file, xác nhận và commit",
+    "type": "flow"
+  },
+  {
+    "name": "03_content_flow",
+    "title": "Luồng sản xuất và lượt đăng",
+    "type": "flow"
+  },
+  {
+    "name": "04_hr_onboard_flow",
+    "title": "Luồng ứng viên đến hồ sơ nhân viên",
+    "type": "flow"
+  },
+  {
+    "name": "05_report_flow",
+    "title": "Luồng báo cáo tuần bất biến",
+    "type": "flow"
+  },
+  {
+    "name": "06_hr_reminder_flow",
+    "title": "Luồng worker nhắc HR",
+    "type": "flow"
+  },
+  {
+    "name": "07_er_identity_tasks",
+    "title": "ERD tài khoản, task và báo cáo",
+    "type": "ER"
+  },
+  {
+    "name": "08_er_sources",
+    "title": "ERD nguồn dữ liệu và facts",
+    "type": "ER"
+  },
+  {
+    "name": "09_er_content",
+    "title": "ERD nội dung và hiệu quả video",
+    "type": "ER"
+  },
+  {
+    "name": "10_er_hr",
+    "title": "ERD nhân sự, tuyển dụng và lương",
+    "type": "ER"
+  }
+]

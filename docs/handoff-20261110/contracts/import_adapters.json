@@ -1,0 +1,372 @@
+{
+  "adapters": [
+    {
+      "code": "TIKTOK_RETURNS",
+      "version": 1,
+      "sheet_hint": "OrderSKUList",
+      "header_row_hint": 1,
+      "data_start_hint": 3,
+      "detect_by_required_headers": true,
+      "never_detect_by_filename": true,
+      "columns": [
+        {
+          "target": "order_id",
+          "header": "Order ID",
+          "sample_column": "A",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "status_raw",
+          "header": "Order Status",
+          "sample_column": "B",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "type_raw",
+          "header": "Cancelation/Return Type",
+          "sample_column": "D",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "order_amount",
+          "header": "Order Amount",
+          "sample_column": "W",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "refund_amount",
+          "header": "Order Refund Amount",
+          "sample_column": "X",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "created_at_source",
+          "header": "Created Time",
+          "sample_column": "Y",
+          "required": true,
+          "type": "DATETIME_DMY_VN"
+        },
+        {
+          "target": "cancelled_at_source",
+          "header": "Cancelled Time",
+          "sample_column": "AD",
+          "required": false,
+          "type": "DATETIME_DMY_VN"
+        },
+        {
+          "target": "sku_id",
+          "header": "SKU ID",
+          "sample_column": "F",
+          "required": false,
+          "type": "TEXT"
+        },
+        {
+          "target": "seller_sku",
+          "header": "Seller SKU",
+          "sample_column": "G",
+          "required": false,
+          "type": "TEXT"
+        },
+        {
+          "target": "quantity",
+          "header": "Quantity",
+          "sample_column": "J",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "returned_quantity",
+          "header": "Sku Quantity of return",
+          "sample_column": "K",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "creator_handle",
+          "header": "Creator Handle",
+          "sample_column": "BD",
+          "required": false,
+          "type": "TEXT"
+        },
+        {
+          "target": "package_id",
+          "header": "Package ID",
+          "sample_column": "AY",
+          "required": false,
+          "type": "TEXT"
+        }
+      ],
+      "known_status_map": {
+        "Cancel|Đã hủy": "CANCEL"
+      },
+      "unknown_status_policy": "BLOCK_REQUIRE_NEW_ADAPTER_SAMPLE"
+    },
+    {
+      "code": "KOC_SALES",
+      "version": 1,
+      "sheet_hint": "Sheet 1",
+      "header_row_hint": 1,
+      "data_start_hint": 3,
+      "detect_by_required_headers": true,
+      "never_detect_by_filename": true,
+      "columns": [
+        {
+          "target": "creator_key",
+          "header": "Tên nhà sáng tạo",
+          "sample_column": "A",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "gmv",
+          "header": "GMV nhờ nhà sáng tạo",
+          "sample_column": "B",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "orders",
+          "header": "Đơn hàng đã ghi nhận",
+          "sample_column": "F",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "refund_amount",
+          "header": "Hoàn tiền",
+          "sample_column": "E",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "estimated_commission",
+          "header": "Hoa hồng ước tính",
+          "sample_column": "V",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "refunded_items",
+          "header": "Số món đã hoàn tiền",
+          "sample_column": "H",
+          "required": true,
+          "type": "INTEGER"
+        }
+      ],
+      "known_status_map": {},
+      "unknown_status_policy": null
+    },
+    {
+      "code": "SHOPEE_SALES",
+      "version": 1,
+      "sheet_hint": "sheet1",
+      "header_row_hint": 2,
+      "data_start_hint": 3,
+      "detect_by_required_headers": true,
+      "never_detect_by_filename": true,
+      "columns": [
+        {
+          "target": "date",
+          "header": "Ngày",
+          "sample_column": "A",
+          "required": true,
+          "type": "DATE_DMY"
+        },
+        {
+          "target": "revenue",
+          "header": "Doanh thu",
+          "sample_column": "F",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "orders",
+          "header": "Tổng số đơn hàng",
+          "sample_column": "D",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "cancelled_orders",
+          "header": "Số lượng đơn đã hủy",
+          "sample_column": "L",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "refunded_orders",
+          "header": "SL đơn hoàn tiền",
+          "sample_column": "H",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "effective_revenue",
+          "header": "Doanh thu đơn hàng hiệu quả",
+          "sample_column": "B",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "refund_amount",
+          "header": "Số tiền đơn hàng hoàn tiền",
+          "sample_column": "G",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "cancelled_amount",
+          "header": "Số tiền đơn hàng hủy",
+          "sample_column": "K",
+          "required": false,
+          "type": "DECIMAL"
+        }
+      ],
+      "known_status_map": {},
+      "unknown_status_policy": null
+    },
+    {
+      "code": "TIKTOK_SALES",
+      "version": 1,
+      "sheet_hint": "sheet1",
+      "header_row_hint": 2,
+      "data_start_hint": 3,
+      "detect_by_required_headers": true,
+      "never_detect_by_filename": true,
+      "columns": [
+        {
+          "target": "date",
+          "header": "Ngày",
+          "sample_column": "A",
+          "required": true,
+          "type": "DATE_DMY"
+        },
+        {
+          "target": "revenue",
+          "header": "Doanh thu",
+          "sample_column": "F",
+          "required": true,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "orders",
+          "header": "Tổng số đơn hàng",
+          "sample_column": "D",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "cancelled_orders",
+          "header": "Số lượng đơn đã hủy",
+          "sample_column": "L",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "refunded_orders",
+          "header": "SL đơn hoàn tiền",
+          "sample_column": "H",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "effective_revenue",
+          "header": "Doanh thu đơn hàng hiệu quả",
+          "sample_column": "B",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "refund_amount",
+          "header": "Số tiền đơn hàng hoàn tiền",
+          "sample_column": "G",
+          "required": false,
+          "type": "DECIMAL"
+        },
+        {
+          "target": "cancelled_amount",
+          "header": "Số tiền đơn hàng hủy",
+          "sample_column": "K",
+          "required": false,
+          "type": "DECIMAL"
+        }
+      ],
+      "known_status_map": {},
+      "unknown_status_policy": null
+    },
+    {
+      "code": "VIDEO_PERFORMANCE",
+      "version": 1,
+      "sheet_hint": "Content",
+      "header_row_hint": 1,
+      "data_start_hint": 2,
+      "detect_by_required_headers": true,
+      "never_detect_by_filename": true,
+      "columns": [
+        {
+          "target": "title",
+          "header": "Video title",
+          "sample_column": "B",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "url",
+          "header": "Video link",
+          "sample_column": "C",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "published_raw",
+          "header": "Post time",
+          "sample_column": "D",
+          "required": true,
+          "type": "TEXT"
+        },
+        {
+          "target": "collected_raw",
+          "header": "Time",
+          "sample_column": "A",
+          "required": false,
+          "type": "TEXT"
+        },
+        {
+          "target": "likes",
+          "header": "Total likes",
+          "sample_column": "E",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "comments",
+          "header": "Total comments",
+          "sample_column": "F",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "shares",
+          "header": "Total shares",
+          "sample_column": "G",
+          "required": true,
+          "type": "INTEGER"
+        },
+        {
+          "target": "views",
+          "header": "Total views",
+          "sample_column": "H",
+          "required": true,
+          "type": "INTEGER"
+        }
+      ],
+      "known_status_map": {},
+      "unknown_status_policy": null
+    }
+  ]
+}

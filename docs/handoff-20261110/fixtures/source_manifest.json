@@ -1,0 +1,86 @@
+{
+  "original_files": [
+    {
+      "adapter": "TIKTOK_RETURNS",
+      "file": "fixtures/originals/TikTok退貨取消報表_Bao_cao_hoan_huy_TikTok_20261102-20261108.xlsx",
+      "sha256": "dfa04d153d741150143943f86f126e63f571f96781cda96922b9e85a717306ea",
+      "bytes": 52805,
+      "controls": {
+        "rows": 113,
+        "orders": 112
+      },
+      "period_confirmed": false,
+      "platform_confirmed_by_content": true,
+      "shop_company_confirmed": false
+    },
+    {
+      "adapter": "KOC_SALES",
+      "file": "fixtures/originals/TikTok達人銷售報表_Bao_cao_doanh_so_KOC_TikTok_20261102-20261108.xlsx",
+      "sha256": "30a29fc3cb0a16685e0d1f35702c9f9c13f41ff90601b499a7405742df21d1d6",
+      "bytes": 111645,
+      "controls": {
+        "totals": {
+          "gmv": 52399786.0,
+          "refund": 2029427.0,
+          "orders": 726.0,
+          "commission": 1678199.0
+        },
+        "count": 1307
+      },
+      "period_confirmed": false,
+      "platform_confirmed_by_content": true,
+      "shop_company_confirmed": false
+    },
+    {
+      "adapter": "SHOPEE_SALES",
+      "file": "fixtures/originals/Shopee銷售報表_Bao_cao_ban_hang_Shopee_20261102-20261108.xlsx",
+      "sha256": "96fc8fc22b2bd4a4361868317d9b27f305c0b6086a3e3f7768a3c5c507f752d8",
+      "bytes": 4371,
+      "controls": {
+        "totals": {
+          "revenue": 28040779.0,
+          "effective": 25536049.0,
+          "orders": 360.0,
+          "cancelled": 36.0,
+          "refunded": 2.0,
+          "refund_amount": 95665.0
+        }
+      },
+      "period_confirmed": true,
+      "platform_confirmed_by_content": false,
+      "shop_company_confirmed": false
+    },
+    {
+      "adapter": "TIKTOK_SALES",
+      "file": "fixtures/originals/TikTok銷售報表_Bao_cao_ban_hang_TikTok_20261102-20261108.xlsx",
+      "sha256": "6122d93c6b36b4bf552439539780db38a99cf3a4f8ac9ca3c261b89235b07545",
+      "bytes": 4372,
+      "controls": {
+        "totals": {
+          "revenue": 67492567.0,
+          "effective": 60361037.0,
+          "orders": 930.0,
+          "cancelled": 100.0,
+          "refunded": 4.0,
+          "refund_amount": 234569.0
+        }
+      },
+      "period_confirmed": true,
+      "platform_confirmed_by_content": false,
+      "shop_company_confirmed": false
+    },
+    {
+      "adapter": "VIDEO_PERFORMANCE",
+      "file": "fixtures/originals/TikTok影片成效報表_Bao_cao_hieu_qua_video_TikTok_20261102-20261108.xlsx",
+      "sha256": "66b485726e8bbecfbe91d39510c5ca292d8e16d797849600bf8e96a53c5e5aa4",
+      "bytes": 23588,
+      "controls": {
+        "video_rows": 15
+      },
+      "period_confirmed": false,
+      "platform_confirmed_by_content": true,
+      "shop_company_confirmed": false
+    }
+  ],
+  "note": "File gốc giữ nguyên; tên không phải nguồn xác minh metadata. Controls không phải nghiệm thu business definitions."
+}

@@ -1,0 +1,16 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.4,ranksep=0.65];
+node [shape=box,style="rounded,filled",fillcolor="#f4f7f0",color="#a8bda2",fontname="DejaVu Sans",fontsize=11,margin="0.16,0.12"];
+edge [fontname="DejaVu Sans",fontsize=10,color="#57745d"];
+users [label="users\nuuid id [PK]\ntext username\ninteger permission_version"];
+grants [label="grants\nuuid id [PK]\nuuid user_id [FK]\ntext role\ntext scope"];
+tasks [label="tasks\nuuid id [PK]\nuuid owner_id [FK]\ntext flow_mode\ntext status\ntimestamp due_at"];
+task_events [label="task_events\nbigint id [PK]\nuuid task_id [FK]\njsonb data"];
+reports [label="reports\nuuid id [PK]\nuuid user_id [FK]\ndate period"];
+report_revisions [label="report_revisions\nuuid id [PK]\nuuid report_id [FK]\njsonb snapshot"];
+users -> grants [label="cấp quyền"];
+users -> tasks [label="phụ trách"];
+tasks -> task_events [label="ghi thay đổi"];
+users -> reports [label="nộp tuần"];
+reports -> report_revisions [label="nhiều bản nộp"];
+}

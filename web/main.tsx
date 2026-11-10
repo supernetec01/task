@@ -22,10 +22,19 @@ import { TemplateAdmin } from './template-admin';
 import { EmployeeDirectory } from './employees';
 import { PasswordHistory } from './accounts';
 import { Metrics, Claims } from './business';
+import { WorkTasks, CreateChecklist } from './checklist';
+import { SourceWorkspace, ResourceSettings, SourceRows, HandoffSettings } from './sources';
+import { ContentWorkspace } from './content-v2';
+import { HrWorkspace, RoleProvision } from './hr-v2';
 import './style.css';
 const names: Record<string, string> = {
   dashboard: 'Tổng quan công việc',
   mine: 'Việc của tôi',
+  legacy: 'Công việc cũ',
+  'legacy-users': 'Quản lý tài khoản cũ',
+  'legacy-business': 'Nguồn số liệu cũ',
+  'legacy-hr': 'Hồ sơ nhân sự cũ',
+  'legacy-content': 'Hồ sơ nội dung cũ',
   team: 'Công việc nhóm',
   plans: 'Kế hoạch tuần',
   reports: 'Báo cáo',
@@ -85,7 +94,9 @@ function App() {
     [revision, setRevision] = useState(0),
     [sub, setSub] = useState(''),
     [filter, setFilter] = useState(''),
-    [employeeFocus, setEmployeeFocus] = useState('');
+    [employeeFocus, setEmployeeFocus] = useState(''),
+    [reportFocus, setReportFocus] = useState(''),
+    [hrTarget, setHrTarget] = useState('');
   useHourlyRefresh(() => setRevision((r) => r + 1));
   const permissionKey = useRef('');
   const [accessRevision, setAccessRevision] = useState(0);
@@ -142,6 +153,11 @@ function App() {
     return () => clearTimeout(timer);
   }, [me]);
   const go = (v: string) => {
+    if (
+      document.querySelector('form[data-dirty="true"]') &&
+      !confirm('Bạn có thay đổi chưa lưu. Chuyển màn hình và bỏ nội dung này?')
+    )
+      return;
     setPage(v);
     setOpen(false);
     setSub('');
@@ -204,7 +220,10 @@ function App() {
         <div className="userfoot">
           <strong>{me.name}</strong>
           <div className="row-meta">
-            {[...new Set(me.grants.map((g: any) => roleLabel[g.role] || g.role))].join(' · ')}
+            {(me.display_roles?.length
+              ? me.display_roles.map((r: string) => roleLabel[r] || r)
+              : ['Quyền cũ · cần phân loại']
+            ).join(' · ')}
           </div>
           <button
             className="ghost"
@@ -245,18 +264,24 @@ function App() {
               <div className="eyebrow">SUPER NET WORKSPACE</div>
               <h1>{names[current]}</h1>
             </div>
-            {['dashboard', 'mine', 'team'].includes(current) && me.capabilities.create_task && (
-              <button className="primary" onClick={() => setCreate(true)}>
-                + {me.management ? 'Giao nhiệm vụ' : 'Thêm việc phát sinh'}
-              </button>
-            )}
+            {['dashboard', 'mine', 'team', 'legacy'].includes(current) &&
+              me.capabilities.create_task && (
+                <button className="primary" onClick={() => setCreate(true)}>
+                  + {me.management ? 'Giao nhiệm vụ' : 'Thêm việc phát sinh'}
+                </button>
+              )}
           </div>
           {['dashboard', 'mine', 'team'].includes(current) && (
-            <Tasks
+            <WorkTasks
+              key={current}
               mode={current}
               me={me}
               revision={revision}
               onTask={setTask}
+              onReport={(id: string) => {
+                setReportFocus(id);
+                go('reports');
+              }}
               filter={filter}
               setFilter={setFilter}
               onList={(s: string) => {
@@ -265,11 +290,36 @@ function App() {
               }}
             />
           )}
+          {current === 'legacy' && (
+            <Tasks
+              mode={me.management ? 'team' : 'mine'}
+              me={me}
+              revision={revision}
+              onTask={setTask}
+              filter={filter}
+              setFilter={setFilter}
+              onList={() => {}}
+            />
+          )}
+          {current === 'legacy-users' && me.admin && <Team me={me} />}
+          {current === 'legacy-business' && <Metrics kind="SALES" />}
+          {current === 'legacy-hr' && <EmployeeDirectory me={me} />}
+          {current === 'legacy-content' && <Records module="content" me={me} />}
           {current === 'plans' && <Plans me={me} />}{' '}
-          {current === 'reports' && <Reports me={me} onTask={setTask} />}{' '}
-          {['content', 'business', 'ads', 'hr', 'warehouse', 'finance', 'issues'].includes(
-            current,
-          ) && (
+          {current === 'reports' && (
+            <Reports key={reportFocus} me={me} onTask={setTask} initialRevision={reportFocus} />
+          )}{' '}
+          {current === 'content' && <ContentWorkspace />}
+          {current === 'business' && <SourceWorkspace />}
+          {current === 'hr' && (
+            <HrWorkspace
+              key={hrTarget + employeeFocus}
+              me={me}
+              initialSelected={employeeFocus}
+              initialTarget={hrTarget}
+            />
+          )}
+          {['ads', 'warehouse', 'finance', 'issues'].includes(current) && (
             <>
               {['business', 'ads', 'content'].includes(current) && (
                 <div className="tabs">
@@ -306,11 +356,44 @@ function App() {
               )}
             </>
           )}
-          {current === 'requests' && <Requests me={me} />} {current === 'users' && <Team me={me} />}{' '}
+          {current === 'requests' && <Requests me={me} />}{' '}
+          {current === 'users' && <RoleProvision me={me} />}{' '}
           {current === 'templates' && <TemplateAdmin />}
-          {current === 'settings' && <Settings />} {current === 'accounts' && <Accounts me={me} />}{' '}
+          {current === 'settings' && (
+            <>
+              <HandoffSettings />
+              <ResourceSettings />
+              <Settings />
+            </>
+          )}{' '}
+          {current === 'accounts' && <Accounts me={me} />}{' '}
           {current === 'notifications' && (
             <Notifications
+              onOpen={async (path: string) => {
+                if (/^\/tasks\/[0-9a-f-]{36}$/.test(path)) {
+                  go('mine');
+                  setTask(path.split('/')[2]);
+                } else if (/^\/report-revisions\/[0-9a-f-]{36}$/.test(path)) {
+                  go('reports');
+                  setReportFocus(path.split('/')[2]);
+                } else if (/^\/employees\/[0-9a-f-]{36}$/.test(path)) {
+                  setEmployeeFocus(path.split('/')[2]);
+                  setHrTarget('employees');
+                  go('hr');
+                } else if (/^\/candidates\/[0-9a-f-]{36}$/.test(path)) {
+                  setEmployeeFocus(path.split('/')[2]);
+                  setHrTarget('candidates');
+                  go('hr');
+                } else if (/^\/hr\/contracts\/[0-9a-f-]{36}$/.test(path)) {
+                  const c = await api('/contracts/' + path.split('/')[3]);
+                  setEmployeeFocus(c.employee_id);
+                  setHrTarget('contracts');
+                  go('hr');
+                } else if (path === '/hr/birthdays') {
+                  setHrTarget('birthdays');
+                  go('hr');
+                }
+              }}
               onEmployee={(id: string) => {
                 setEmployeeFocus(id);
                 go('hr');
@@ -335,8 +418,20 @@ function App() {
                     type: 'password',
                     required: true,
                   },
+                  {
+                    key: 'confirm',
+                    label: 'Xác nhận mật khẩu mới',
+                    type: 'password',
+                    required: true,
+                  },
                 ]}
-                onSubmit={(v) => api('/auth/password', v)}
+                onSubmit={(v) => {
+                  if (v.confirm !== v.new_password) throw Error('Mật khẩu xác nhận chưa khớp');
+                  return api('/auth/password', {
+                    current_password: v.current_password,
+                    new_password: v.new_password,
+                  });
+                }}
                 label="Đổi mật khẩu"
               />
             </div>
@@ -346,11 +441,22 @@ function App() {
           </footer>
         </div>
       </main>
-      {create && (
+      {create && current === 'legacy' && (
         <CreateTask
           me={me}
           onClose={() => setCreate(false)}
-          onDone={(id) => {
+          onDone={(id: string) => {
+            setCreate(false);
+            setTask(id);
+            setRevision((n) => n + 1);
+          }}
+        />
+      )}
+      {create && current !== 'legacy' && (
+        <CreateChecklist
+          me={me}
+          onClose={() => setCreate(false)}
+          onDone={(id: string) => {
             setCreate(false);
             setTask(id);
             setRevision((r) => r + 1);
@@ -549,7 +655,7 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
     </>
   );
 }
-function Notifications({ onEmployee }: any) {
+function Notifications({ onEmployee, onOpen }: any) {
   const [rev, setRev] = useState(0),
     { data, error } = useLoad('/notifications', rev);
   useHourlyRefresh(() => setRev((r) => r + 1));
@@ -561,7 +667,10 @@ function Notifications({ onEmployee }: any) {
           data.items.map((n: any) => (
             <div className="notification" key={n.id}>
               <p>{n.message}</p>
-              {n.event_key.startsWith('contract:') && n.object_id && (
+              {n.action_path && (
+                <button onClick={() => onOpen(n.action_path)}>Mở nội dung liên quan</button>
+              )}
+              {!n.action_path && n.event_key.startsWith('contract:') && n.object_id && (
                 <button onClick={() => onEmployee(n.object_id)}>Mở hồ sơ nhân sự</button>
               )}
               {n.read_at ? (

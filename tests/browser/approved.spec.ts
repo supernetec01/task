@@ -6,6 +6,7 @@ async function login(page: Page, user: string) {
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
   await expect(page.locator('.sidebar')).toBeAttached();
+  await nav(page, 'Công việc cũ');
 }
 async function nav(page: Page, name: string) {
   if (await page.getByRole('button', { name: 'Mở menu' }).isVisible())
@@ -29,8 +30,9 @@ test('Approved HR UI · Admin-created profile visible/editable to HR, payroll se
   await modal.getByLabel('Mã nhân sự', { exact: true }).fill(code);
   await modal.getByLabel('Họ tên', { exact: true }).fill(name);
   await modal.getByLabel('Ngày vào làm', { exact: true }).fill('2026-11-01');
+  await modal.getByLabel('Bộ phận', { exact: true }).selectOption({ index: 1 });
   await modal.getByLabel('Giai đoạn công việc', { exact: true }).selectOption('OFFICIAL');
-  await modal.getByLabel('Nội dung', { exact: true }).check();
+  await modal.getByLabel('Content Marketing', { exact: true }).check();
   await modal.getByRole('button', { name: 'Lưu hồ sơ nhân viên', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Hồ sơ nhân viên' })).toBeVisible();
   const adminDrawer = page.getByRole('dialog', { name: 'Hồ sơ nhân viên' });
@@ -47,7 +49,7 @@ test('Approved HR UI · Admin-created profile visible/editable to HR, payroll se
   await provisioning
     .getByLabel('Mật khẩu khởi tạo (ít nhất 11 ký tự)', { exact: true })
     .fill('UI-Provisioning-Password-2026!');
-  await expect(provisioning.getByLabel('Nội dung', { exact: true })).toBeChecked();
+  await expect(provisioning.getByLabel('Content Marketing', { exact: true })).toBeChecked();
   await provisioning
     .getByRole('button', { name: 'Tạo tài khoản và cấp quyền', exact: true })
     .click();
@@ -108,7 +110,7 @@ test('Approved errors · field validation is visible/focused and failed imports 
   page,
 }, info) => {
   await login(page, 'admin');
-  await nav(page, 'Đội ngũ & phân quyền');
+  await nav(page, 'Quản lý tài khoản cũ');
   await page.getByRole('button', { name: '+ Tạo tài khoản', exact: true }).click();
   const modal = page.getByRole('dialog');
   await modal.getByLabel('Họ tên', { exact: true }).fill('QC lỗi form');
@@ -116,7 +118,7 @@ test('Approved errors · field validation is visible/focused and failed imports 
   await modal
     .getByLabel('Mật khẩu khởi tạo (ít nhất 11 ký tự)', { exact: true })
     .fill('UI-Review-Password-2026!');
-  await modal.getByLabel('Nội dung', { exact: true }).check();
+  await modal.getByLabel('Content Marketing', { exact: true }).check();
   await modal.getByRole('button', { name: 'Tạo tài khoản và cấp quyền', exact: true }).click();
   await expect(modal.getByLabel('Username', { exact: true })).toBeFocused();
   await expect(modal.getByLabel('Username', { exact: true })).toHaveAttribute(
@@ -135,8 +137,8 @@ test('Approved errors · field validation is visible/focused and failed imports 
       body: JSON.stringify({ code: 'TEST_FAILURE', message: 'Không tải được nguồn nhập kiểm thử' }),
     }),
   );
-  await nav(page, 'Kinh doanh');
-  await page.getByRole('button', { name: 'Số liệu bán hàng', exact: true }).click();
+  await nav(page, 'Nguồn số liệu cũ');
+
   await expect(page.getByRole('alert')).toContainText('Không tải được nguồn nhập kiểm thử');
   await expect(
     page.getByRole('button', { name: 'Thử tải lại nguồn nhập', exact: true }),

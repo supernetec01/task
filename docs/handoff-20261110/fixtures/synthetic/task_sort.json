@@ -1,0 +1,79 @@
+{
+  "as_of": "2026-11-10T14:00:00+07:00",
+  "items": [
+    {
+      "id": "A",
+      "title": "Quá hạn ưu tiên",
+      "status": "IN_PROGRESS",
+      "priority": "URGENT",
+      "due_at": "2026-11-09T17:00:00+07:00",
+      "owner": "Sàn A"
+    },
+    {
+      "id": "B",
+      "title": "Quá hạn cũ hơn",
+      "status": "WAITING",
+      "priority": "NORMAL",
+      "due_at": "2026-11-08T17:00:00+07:00",
+      "owner": "HR B"
+    },
+    {
+      "id": "C",
+      "title": "Hôm nay ưu tiên",
+      "status": "IN_PROGRESS",
+      "priority": "URGENT",
+      "due_at": "2026-11-10T17:00:00+07:00",
+      "owner": "Content C"
+    },
+    {
+      "id": "D",
+      "title": "Hôm nay thường",
+      "status": "WAITING",
+      "priority": "NORMAL",
+      "due_at": "2026-11-10T16:00:00+07:00",
+      "owner": "Sàn A"
+    },
+    {
+      "id": "E",
+      "title": "Sắp đến hạn",
+      "status": "WAITING",
+      "priority": "NORMAL",
+      "due_at": "2026-11-12T10:00:00+07:00",
+      "owner": "HR B"
+    },
+    {
+      "id": "F",
+      "title": "Hạn xa ưu tiên",
+      "status": "WAITING",
+      "priority": "URGENT",
+      "due_at": "2026-11-20T10:00:00+07:00",
+      "owner": "Content C"
+    },
+    {
+      "id": "G",
+      "title": "Đã xong",
+      "status": "DONE",
+      "priority": "NORMAL",
+      "due_at": "2026-11-09T18:00:00+07:00",
+      "completed_at": "2026-11-09T16:00:00+07:00",
+      "owner": "Sàn A"
+    }
+  ],
+  "expected_attention_open": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F"
+  ],
+  "expected_due_open": [
+    "B",
+    "A",
+    "D",
+    "C",
+    "E",
+    "F"
+  ],
+  "synthetic": true
+}

@@ -25,13 +25,25 @@ export function Summary({ s, onFilter }: { s: any; onFilter?: (v: string) => voi
     </div>
   );
 }
-export function Reports({ me, onTask }: { me: any; onTask: (id: string) => void }) {
-  const [period, setPeriod] = useState(monday()),
+export function Reports({
+  me,
+  onTask,
+  initialRevision = '',
+}: {
+  me: any;
+  onTask: (id: string) => void;
+  initialRevision?: string;
+}) {
+  const [period, setPeriod] = useState(
+      me.capabilities.team_work
+        ? new Date(+new Date(monday() + 'T12:00:00Z') - 7 * 86400e3).toISOString().slice(0, 10)
+        : monday(),
+    ),
     [rev, setRev] = useState(0),
-    [mode, setMode] = useState('own'),
-    [revision, setRevision] = useState('');
-  const list = useLoad('/reports/submitted?period=' + period, rev),
-    live = useLoad('/reports/live?period=' + period, rev);
+    [mode, setMode] = useState(initialRevision || me.capabilities.team_work ? 'submitted' : 'own'),
+    [revision, setRevision] = useState(initialRevision);
+  const list = useLoad('/reports/submitted?schema_version=2&period=' + period, rev),
+    live = useLoad('/reports/live?schema_version=2&period=' + period, rev);
   const selected = useLoad(revision ? '/report-revisions/' + revision : null, rev);
   const snap = mode === 'own' ? live.data : selected.data?.snapshot;
   const [role, setRole] = useState(''),
@@ -181,6 +193,68 @@ export function Reports({ me, onTask }: { me: any; onTask: (id: string) => void 
                     : snap.summary
                 }
               />
+              {snap.schema_version === 2 && (
+                <>
+                  <div className="panel">
+                    <h3>Hoàn thành trong kỳ</h3>
+                    <TaskTable
+                      items={snap.task_sections.completed_in_period.filter(
+                        (t: any) => !role || t.role === role,
+                      )}
+                      onOpen={onTask}
+                    />
+                  </div>
+                  <div className="handoff-cards">
+                    {snap.professional_sections
+                      .filter((s: any) => !role || s.role === role)
+                      .map((s: any, i: number) => (
+                        <div className="panel" key={i}>
+                          <h3>{roleLabel[s.role]}</h3>
+                          {s.role === 'CONTENT' ? (
+                            <>
+                              <p>
+                                Kịch bản: {s.scripts_completed} · Lượt quay: {s.shoots_completed} ·
+                                Clip hoàn chỉnh: {s.clips_completed}
+                              </p>
+                              <p>Lượt đăng: {s.publications.length}</p>
+                              <p>
+                                GMV D7: {s.video_d7.gmv ?? 'N/A'} · {s.video_d7.missing_reason}
+                              </p>
+                              {s.video_d7.windows?.map((w: any) => (
+                                <p key={w.publication_id}>
+                                  Lượt đăng · D7: {w.status} · GMV {w.gmv ?? 'N/A'}
+                                </p>
+                              ))}
+                            </>
+                          ) : s.role === 'HR' ? (
+                            <>
+                              <p>
+                                Nhận việc: {s.hires} · Phỏng vấn: {s.interviews} · Hợp đồng:{' '}
+                                {s.contracts}
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p>
+                                {s.currency} · Doanh thu nguồn: {s.sales?.revenue ?? 'N/A'} · Độ phủ{' '}
+                                {s.sales?.days ?? 0}/7 ngày
+                              </p>
+                              <p>
+                                GMV KOC: {s.koc?.gmv ?? 'N/A'} ·{' '}
+                                {s.koc?.availability === 'UNCONFIRMED_PERIOD'
+                                  ? 'Chưa có kỳ nguồn khớp tuần'
+                                  : ''}
+                              </p>
+                              <p>Hoa hồng ước tính: {s.koc?.estimated_commission ?? 'N/A'}</p>
+                              <p>Hoa hồng quyết toán: N/A · chưa có nguồn</p>
+                              {s.missing_reason && <p>{s.missing_reason}</p>}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </>
+              )}
               <div className="split">
                 {snap.sections
                   .filter((s: any) => !role || s.role === role)
@@ -321,7 +395,7 @@ export function Reports({ me, onTask }: { me: any; onTask: (id: string) => void 
                         }
                         const report = await api(
                           '/reports/submit',
-                          { period, expected_draft_versions: versions },
+                          { schema_version: 2, period, expected_draft_versions: versions },
                           'POST',
                           key,
                         );

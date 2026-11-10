@@ -1,0 +1,23 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.45,ranksep=0.5];
+node [shape=box,style="rounded,filled",fillcolor="#edf3e8",color="#b9cdb5",fontname="DejaVu Sans",fontsize=12,margin="0.15,0.12"];
+edge [color="#57745d",fontname="DejaVu Sans",fontsize=10];
+A [label="Tổng hợp task events và nguồn đúng kỳ",shape=box];
+M [label="Thiếu nguồn / chưa xác nhận?",shape=diamond];
+N [label="Metric null + availability + cảnh báo",shape=box];
+D [label="Nháp riêng + nhận xét + kế hoạch",shape=box];
+V [label="Kiểm version / quyền / người nhận Sếp",shape=diamond];
+E [label="Giữ nháp; báo lỗi cụ thể",shape=box];
+S [label="Transaction snapshot revision + outbox",shape=box];
+B [label="Sếp xem đúng bản đã nộp",shape=box];
+X [label="Xuất Excel từ snapshot",shape=box];
+A -> M;
+M -> N [label="Có"];
+M -> D [label="Không"];
+N -> D [label="Vẫn nộp được phần khác"];
+D -> V [label="Nộp"];
+V -> E [label="Không hợp lệ"];
+V -> S [label="Hợp lệ"];
+S -> B;
+B -> X;
+}

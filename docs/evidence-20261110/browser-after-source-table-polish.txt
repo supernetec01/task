@@ -1,0 +1,33 @@
+[WebServer] (node:94165) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94195) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:94256) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 16 tests using 1 worker
+
+(node:94265) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [desktop] › tests/browser/handoff.spec.ts:23:1 › HANDOFF TASK/UI · employee checklist save, complete and server persistence (2.4s)
+  ✓   2 [desktop] › tests/browser/handoff.spec.ts:55:1 › HANDOFF CONTENT · real script stage and persisted production profile (1.9s)
+  ✓   3 [desktop] › tests/browser/handoff.spec.ts:74:1 › HANDOFF HR · create candidate, application and private server data (1.4s)
+  ✓   4 [desktop] › tests/browser/handoff.spec.ts:94:1 › HANDOFF MARKET · typed sales and KOC summaries from confirmed test sources (1.4s)
+  ✓   5 [desktop] › tests/browser/handoff.spec.ts:113:1 › HANDOFF BOSS/AUTH · scope allows assignment and submitted reports, denies HR and source API (1.8s)
+  ✓   6 [desktop] › tests/browser/handoff.spec.ts:139:1 › HANDOFF ADMIN · source catalog persists from settings and only five roles are offered (1.3s)
+  ✓   7 [desktop] › tests/browser/handoff.spec.ts:166:1 › HANDOFF CONT05/SORT07 · unsaved content survives tabs/hourly refresh and close requires confirmation (1.5s)
+  ✓   8 [desktop] › tests/browser/handoff.spec.ts:203:1 › HANDOFF SORT07 · completion updates its row in place until explicit reload (2.1s)
+(node:95087) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   9 [mobile] › tests/browser/handoff.spec.ts:23:1 › HANDOFF TASK/UI · employee checklist save, complete and server persistence (2.0s)
+  ✓  10 [mobile] › tests/browser/handoff.spec.ts:55:1 › HANDOFF CONTENT · real script stage and persisted production profile (1.7s)
+  ✓  11 [mobile] › tests/browser/handoff.spec.ts:74:1 › HANDOFF HR · create candidate, application and private server data (1.5s)
+  ✓  12 [mobile] › tests/browser/handoff.spec.ts:94:1 › HANDOFF MARKET · typed sales and KOC summaries from confirmed test sources (1.3s)
+  ✓  13 [mobile] › tests/browser/handoff.spec.ts:113:1 › HANDOFF BOSS/AUTH · scope allows assignment and submitted reports, denies HR and source API (1.2s)
+  ✓  14 [mobile] › tests/browser/handoff.spec.ts:139:1 › HANDOFF ADMIN · source catalog persists from settings and only five roles are offered (2.1s)
+  ✓  15 [mobile] › tests/browser/handoff.spec.ts:166:1 › HANDOFF CONT05/SORT07 · unsaved content survives tabs/hourly refresh and close requires confirmation (1.7s)
+  ✓  16 [mobile] › tests/browser/handoff.spec.ts:203:1 › HANDOFF SORT07 · completion updates its row in place until explicit reload (2.5s)
+
+  16 passed (33.2s)

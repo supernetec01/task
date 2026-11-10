@@ -1,0 +1,26 @@
+flowchart TD
+  A["Chọn loại + pháp nhân + nguồn + kỳ"]
+  B["Upload private; kiểm type / checksum"]
+  C["Nhận diện sheet và header"]
+  D["Parse + chuẩn hóa + kiểm dòng"]
+  E{"Có lỗi chặn?"}
+  F["Thông báo sheet / dòng / cột; tải lại"]
+  G["Preview + coverage + xác nhận metadata"]
+  H{"Quyền / token / version còn đúng?"}
+  I["Khóa source series; kiểm trùng / overlap"]
+  J["Transaction facts + revision + outbox"]
+  K["Thành công; lịch sử nguồn"]
+  A --> B
+  B --> C
+  C --> D
+  D --> E
+  E -->|"Có"| F
+  F -->|"Sửa nguồn"| A
+  E -->|"Không"| G
+  G -->|"Xác nhận"| H
+  H -->|"Không"| F
+  H -->|"Có"| I
+  I -->|"Xung đột / trùng"| F
+  I -->|"Hợp lệ"| J
+  J -->|"Commit"| K
+  J -->|"Rollback khi lỗi"| F

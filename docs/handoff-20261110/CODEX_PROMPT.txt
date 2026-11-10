@@ -1,0 +1,13 @@
+Bạn là Codex triển khai sửa repo https://github.com/supernetec01/task.git theo bộ SuperNet_Dev_Handoff_20261110.
+
+Khách hàng đã duyệt nâng cấp và giao diện 5 ROLE. Đọc 00_READ_FIRST.md, 01_CODEX_EXECUTION_CONTRACT.md và toàn bộ tài liệu theo thứ tự. Gói này là nguồn yêu cầu mới; prototype là mẫu bố cục, không phải logic backend hoàn thiện.
+
+Trước khi sửa: kiểm tra HEAD so với commit 217671e39b85221f5653e24c86640400ede074db; đọc AGENTS.md trong repo; lập IMPLEMENTATION_STATUS.md liên kết acceptance IDs với file và test.
+
+Giữ stack và dữ liệu hiện có. Không tự viết một app khác, reset DB, seed production hoặc sửa mật khẩu người dùng. Đặc biệt xử lý constraint DONE theo flow_mode để checklist mới và task legacy cùng tồn tại. Thực hiện bộ lọc và sort chính xác theo 04_TASK_FILTER_SORT.md.
+
+Không tự đoán metadata Excel, nguồn GMV D7, kỳ KOC, năm/giờ video, ánh xạ ROLE ngoài mapping hay thông tin lương. G01–G05 phải hiện N/A/chờ xác nhận và chặn phần commit tương ứng; vẫn hoàn thiện phần độc lập. Không thêm nghiệp vụ ngoài phạm vi hoặc fake success khi chưa lưu DB.
+
+Sơ đồ trong diagrams/, data_dictionary và relationships trong schema/, API/request schemas/import adapters trong contracts/. SQL_REFERENCE có guard, không phải migration để chạy thẳng. Viết migration thật đã review, kiểm thử trên DB_test và so fingerprint trước/sau.
+
+Triển khai từng lát theo12. Chạy build, unit/integration/browser phù hợp và ghi bằng chứng cho13. Báo cáo các requirement hoàn thành, phần thiếu nguồn, kết quả test thật và hướng dẫn nâng cấp Windows/LAN. Không coi doc kiểm tra đóng gói hoặc prototype RAM là sản phẩm đã nghiệm thu.

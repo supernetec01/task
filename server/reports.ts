@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import ExcelJS from 'exceljs';
 import { type API } from './app.js';
+import { snapshotV2 } from './report-v2.js';
+import { isBoss, teamWork } from './handoff-access.js';
 import {
   type DB,
   type Actor,
@@ -156,7 +158,10 @@ export async function revisionAccess(c: DB, a: Actor, id: string) {
   );
   need(r, 'Không tìm thấy báo cáo', 404, 'NOT_FOUND');
   need(
-    r.user_id === a.id || manages(a, { id: r.user_id, team_id: r.team_id }),
+    r.user_id === a.id ||
+      (r.snapshot.schema_version === 2
+        ? teamWork(a)
+        : manages(a, { id: r.user_id, team_id: r.team_id })),
     'Không tìm thấy báo cáo',
     404,
     'NOT_FOUND',
@@ -175,6 +180,40 @@ export async function revisionAccess(c: DB, a: Actor, id: string) {
       ),
     };
     r.snapshot.summary = counts(r.snapshot.principal);
+    if (r.snapshot.schema_version === 2) {
+      r.snapshot.professional_sections = r.snapshot.professional_sections.filter((s: any) =>
+        roles.includes(s.role),
+      );
+      for (const key of [
+        'created_in_period',
+        'completed_in_period',
+        'open_carryover',
+        'cancelled_in_period',
+      ])
+        r.snapshot.task_sections[key] = r.snapshot.task_sections[key].filter((t: any) =>
+          roles.includes(t.role),
+        );
+      r.snapshot.task_sections.activity_in_period =
+        r.snapshot.task_sections.activity_in_period.filter((e: any) =>
+          roles.includes(e.data.job_at_event),
+        );
+      for (const key of ['completion_events', 'reopened_in_period'])
+        if (r.snapshot.task_sections[key])
+          r.snapshot.task_sections[key] = r.snapshot.task_sections[key].filter((e: any) =>
+            roles.includes(e.data.job_at_event),
+          );
+      if (r.snapshot.task_sections.currently_done)
+        r.snapshot.task_sections.currently_done = r.snapshot.task_sections.currently_done.filter(
+          (t: any) => roles.includes(t.role),
+        );
+      const done = r.snapshot.task_sections.completed_in_period;
+      r.snapshot.summary = {
+        ...r.snapshot.summary,
+        done: done.length,
+        on_time: done.filter((t: any) => (t.timing_at_completion || t.timing) === 'ON_TIME').length,
+        late: done.filter((t: any) => (t.timing_at_completion || t.timing) === 'LATE').length,
+      };
+    }
     r.snapshot.source_manifest = { note: 'Nguồn được giới hạn theo quyền hiện tại' };
     r.snapshot.comparison = null;
   }
@@ -244,6 +283,7 @@ export function reportRoutes(api: API) {
   });
   api('GET', '/reports/live', async (c, a, b, q) => {
     need(!q.employee || q.employee === a.id);
+    if (q.schema_version === '2') return snapshotV2(c, a, q.period);
     return snapshot(c, a, q.period);
   });
   api('PUT', '/reports/draft', async (c, a, b) => {
@@ -282,11 +322,12 @@ export function reportRoutes(api: API) {
     const v = z
       .object({
         period: z.iso.date(),
+        schema_version: z.literal(2).optional(),
         expected_draft_versions: z.record(z.string(), z.number().int()).default({}),
       })
       .parse(b);
     need(
-      (await setting(c, 'policies')).report_week_confirmed,
+      b.schema_version === 2 || (await setting(c, 'policies')).report_week_confirmed,
       'Chưa xác nhận chính sách tuần/cohort Q05 trước khi nộp báo cáo thật',
       422,
       'CONFIG_REQUIRED',
@@ -295,7 +336,9 @@ export function reportRoutes(api: API) {
     await c.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [
       'report:' + a.id + v.period,
     ]);
-    await c.query('LOCK TABLE tasks,supporters,submissions,report_drafts IN SHARE MODE');
+    await c.query(
+      'LOCK TABLE tasks,supporters,submissions,report_drafts,task_events,content_stage_events,source_partitions,source_revisions,sales_daily_facts,koc_period_facts,publications,interview_sessions,employee_profiles,employee_contract_revisions,settings IN SHARE MODE',
+    );
     const drafts = await rows(
       c,
       'SELECT * FROM report_drafts WHERE user_id=$1 AND period=$2 FOR UPDATE',
@@ -309,7 +352,8 @@ export function reportRoutes(api: API) {
           409,
           'VERSION_CONFLICT',
         );
-    const current = await snapshot(c, a, v.period);
+    const current: any =
+      b.schema_version === 2 ? await snapshotV2(c, a, v.period) : await snapshot(c, a, v.period);
     need(current.roles.length, 'Không có role chuyên môn hiệu lực', 403, 'FORBIDDEN');
     const people = await rows(
       c,
@@ -323,22 +367,35 @@ export function reportRoutes(api: API) {
         'SELECT * FROM grants WHERE user_id=$1 AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now())',
         [u.id],
       );
-      if (manages(u as Actor, { id: a.id, team_id: a.team_id }) && !isAdmin(u as Actor))
+      if (
+        b.schema_version === 2
+          ? isBoss(u as Actor)
+          : manages(u as Actor, { id: a.id, team_id: a.team_id }) && !isAdmin(u as Actor)
+      )
         recipients.push(u.id);
     }
-    need(recipients.length, 'Chưa cấu hình quản lý/sếp nhận báo cáo Q09', 422, 'CONFIG_REQUIRED');
+    need(
+      recipients.length,
+      'Chưa cấu hình Sếp nhận báo cáo',
+      b.schema_version === 2 ? 503 : 422,
+      'CONFIG_REQUIRED',
+    );
     const container = await one(
       c,
       'INSERT INTO reports(user_id,period) VALUES($1,$2) ON CONFLICT(user_id,period) DO UPDATE SET period=EXCLUDED.period RETURNING *',
       [a.id, v.period],
     );
+    current.recipients = recipients;
     const r = await one(
       c,
       'INSERT INTO report_revisions(report_id,revision,snapshot,recipients) SELECT $1,coalesce(max(revision),0)+1,$2,$3 FROM report_revisions WHERE report_id=$1 RETURNING *',
       [container.id, JSON.stringify(current), recipients],
     );
     for (const id of recipients)
-      await notify(c, id, `report:${r.id}`, 'Có báo cáo tuần mới được nộp', r.id);
+      await c.query(
+        "INSERT INTO outbox(user_id,event_key,message,object_id,object_type,event_type,action_path) VALUES($1,$2,'Có báo cáo tuần mới được nộp',$3,'REPORT_REVISION','REPORT_SUBMITTED',$4) ON CONFLICT DO NOTHING",
+        [id, `report:${r.id}`, r.id, `/report-revisions/${r.id}`],
+      );
     await audit(c, a, 'REPORT_SUBMITTED', 'report', r.id, { revision: r.revision });
     return r;
   });
@@ -347,7 +404,16 @@ export function reportRoutes(api: API) {
     const people = await rows(c, 'SELECT id,name,team_id FROM users WHERE active ORDER BY name');
     const items = [];
     for (const u of people) {
-      if (u.id !== a.id && !manages(a, u)) continue;
+      if (u.id !== a.id && !(q.schema_version === '2' ? teamWork(a) : manages(a, u))) continue;
+      if (
+        q.schema_version === '2' &&
+        !(await one(
+          c,
+          "SELECT id FROM grants WHERE user_id=$1 AND kind='JOB' AND role IN ('CONTENT','HR','MARKETPLACE') AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now())",
+          [u.id],
+        ))
+      )
+        continue;
       const revisions = await rows(
         c,
         'SELECT v.id,v.revision,v.created_at,r.id AS report_id FROM report_revisions v JOIN reports r ON r.id=v.report_id WHERE r.user_id=$1 AND r.period=$2 ORDER BY revision DESC',
@@ -466,6 +532,22 @@ export function reportRoutes(api: API) {
         ['Cohort', s.policy_version],
       ],
     );
+    if (s.schema_version === 2) {
+      sheet(
+        'Chuyen_mon_V2',
+        ['ROLE', 'Snapshot / N/A'],
+        s.professional_sections
+          .filter((p: any) => roles.includes(p.role))
+          .map((p: any) => [p.role, p]),
+      );
+      sheet(
+        'Hoan_thanh_trong_ky',
+        ['Mã', 'Tên', 'Hoàn thành UTC'],
+        s.task_sections.completed_in_period
+          .filter((t: any) => roles.includes(t.role))
+          .map((t: any) => [String(t.code), t.title, t.completed_at]),
+      );
+    }
     await audit(c, a, 'REPORT_EXPORTED', 'report', r.id, { roles });
     const buffer = await workbook.xlsx.writeBuffer();
     reply

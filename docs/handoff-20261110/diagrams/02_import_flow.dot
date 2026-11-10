@@ -1,0 +1,30 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.45,ranksep=0.5];
+node [shape=box,style="rounded,filled",fillcolor="#edf3e8",color="#b9cdb5",fontname="DejaVu Sans",fontsize=12,margin="0.15,0.12"];
+edge [color="#57745d",fontname="DejaVu Sans",fontsize=10];
+A [label="Chọn loại + pháp nhân + nguồn + kỳ",shape=box];
+B [label="Upload private; kiểm type / checksum",shape=box];
+C [label="Nhận diện sheet và header",shape=box];
+D [label="Parse + chuẩn hóa + kiểm dòng",shape=box];
+E [label="Có lỗi chặn?",shape=diamond];
+F [label="Thông báo sheet / dòng / cột; tải lại",shape=box];
+G [label="Preview + coverage + xác nhận metadata",shape=box];
+H [label="Quyền / token / version còn đúng?",shape=diamond];
+I [label="Khóa source series; kiểm trùng / overlap",shape=box];
+J [label="Transaction facts + revision + outbox",shape=box];
+K [label="Thành công; lịch sử nguồn",shape=box];
+A -> B;
+B -> C;
+C -> D;
+D -> E;
+E -> F [label="Có"];
+F -> A [label="Sửa nguồn"];
+E -> G [label="Không"];
+G -> H [label="Xác nhận"];
+H -> F [label="Không"];
+H -> I [label="Có"];
+I -> F [label="Xung đột / trùng"];
+I -> J [label="Hợp lệ"];
+J -> K [label="Commit"];
+J -> F [label="Rollback khi lỗi"];
+}

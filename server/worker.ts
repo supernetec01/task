@@ -14,6 +14,7 @@ import {
 } from './base.js';
 import { logStream } from './logging.js';
 import { createTask } from './tasks.js';
+import { hrJobs } from './hr-jobs.js';
 export function birthdayOccurrence(birthDate: string, today: string) {
   for (const year of [Number(today.slice(0, 4)), Number(today.slice(0, 4)) + 1]) {
     const day = String(year) + birthDate.slice(4);
@@ -36,7 +37,7 @@ export async function runJobs() {
     if (policy.assignment_boundary_confirmed) {
       const pending = await rows(
         c,
-        "SELECT a.*,t.created_by FROM assignments a JOIN tasks t ON t.id=a.task_id WHERE a.status='PENDING' AND a.response_due_at<=clock_timestamp() AND t.status='ASSIGNED' FOR UPDATE OF t,a SKIP LOCKED",
+        "SELECT a.*,t.created_by FROM assignments a JOIN tasks t ON t.id=a.task_id WHERE t.flow_mode='LEGACY_REVIEW' AND a.status='PENDING' AND a.response_due_at<=clock_timestamp() AND t.status='ASSIGNED' FOR UPDATE OF t,a SKIP LOCKED",
       );
       for (const a of pending) {
         await c.query(
@@ -140,14 +141,23 @@ export async function runJobs() {
         );
       }
     }
+    await hrJobs(c);
     const outbox = await rows(
       c,
       'SELECT o.* FROM outbox o JOIN users u ON u.id=o.user_id WHERE o.processed_at IS NULL AND u.active AND o.attempts<10 ORDER BY id FOR UPDATE OF o SKIP LOCKED LIMIT 100',
     );
     for (const o of outbox) {
       await c.query(
-        'INSERT INTO notifications(user_id,event_key,message,object_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',
-        [o.user_id, o.event_key, o.message, o.object_id],
+        'INSERT INTO notifications(user_id,event_key,message,object_id,object_type,event_type,action_path) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT DO NOTHING',
+        [
+          o.user_id,
+          o.event_key,
+          o.message,
+          o.object_id,
+          o.object_type,
+          o.event_type,
+          o.action_path,
+        ],
       );
       await c.query('UPDATE outbox SET processed_at=now(),attempts=attempts+1 WHERE id=$1', [o.id]);
     }

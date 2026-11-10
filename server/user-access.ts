@@ -1,6 +1,7 @@
 import { employeeRevision, basicSnapshot } from './employee-history.js';
 import { hash as passwordHash } from 'argon2';
 import { z } from 'zod';
+import { grantRoles } from './role-bundles.js';
 import type { API } from './app.js';
 import {
   type DB,
@@ -49,6 +50,12 @@ export async function validateReporting(
 }
 export async function addGrant(c: DB, a: Actor, uid: string, input: any) {
   const v = grantSchema.parse(input);
+  need(
+    v.role !== 'EXECUTIVE',
+    'Quyền Ban lãnh đạo cũ chỉ giữ lịch sử; không cấp mới',
+    422,
+    'RETIRED_ROLE',
+  );
   need(
     (v.kind === 'JOB' ? jobs : access).includes(v.role),
     'Vai trò không hợp lệ',
@@ -209,6 +216,7 @@ export function userAccessRoutes(api: API) {
     };
   });
   api('POST', '/users/:id/grants', async (c, a, b, q, p) => {
+    if (b.display_roles) return grantRoles(c, a, p.id, b);
     need(isAdmin(a));
     const u = await one(
       c,

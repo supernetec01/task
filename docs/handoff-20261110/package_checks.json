@@ -1,0 +1,10 @@
+{
+  "json_parse": "PASS",
+  "acceptance_ids_and_unexecuted_status": "PASS",
+  "original_file_checksums": "PASS",
+  "relationship_column_references": "PASS",
+  "reference_sql_guard": "PASS",
+  "offline_html_links": "PASS",
+  "task_sort_reference_fixture": "PASS",
+  "prototype_and_filter_js_syntax": "PASS"
+}

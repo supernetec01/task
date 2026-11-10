@@ -51,6 +51,7 @@ export function Badge({ children }: { children: ReactNode }) {
   return <span className="badge">{children}</span>;
 }
 export const statusLabel: Record<string, string> = {
+  WAITING: 'Chưa thực hiện',
   DRAFT: 'Nháp',
   ASSIGNED: 'Chờ nhận',
   ACCEPTED: 'Đã nhận',
@@ -73,7 +74,7 @@ export const statusLabel: Record<string, string> = {
   FULFILLED: 'Đã ghi nhận xử lý bên ngoài',
 };
 export const roleLabel: Record<string, string> = {
-  CONTENT: 'Nội dung',
+  CONTENT: 'Content Marketing',
   DESIGNER: 'Thiết kế',
   MARKETPLACE: 'Vận hành sàn',
   ADS: 'Quảng cáo',
@@ -219,6 +220,7 @@ export function Form({
   specializedInline = false,
   childrenBeforeExtra = false,
   onConflict,
+  activeSection,
 }: {
   fields: Field[];
   initial?: any;
@@ -232,6 +234,7 @@ export function Form({
   specializedInline?: boolean;
   childrenBeforeExtra?: boolean;
   onConflict?: () => Promise<any>;
+  activeSection?: string;
 }) {
   const [value, setValue] = useState(initial),
     [busy, setBusy] = useState(false),
@@ -269,6 +272,15 @@ export function Form({
         setError(null);
         try {
           await onSubmit(value, key.current);
+          delete form.dataset.dirty;
+          const secrets = [...fields, ...extraFields]
+            .filter((f) => f.type === 'password')
+            .map((f) => f.key);
+          if (secrets.length)
+            setValue((current: any) => ({
+              ...current,
+              ...Object.fromEntries(secrets.map((k) => [k, ''])),
+            }));
           key.current = requestKey();
           setSaved(true);
           form.dispatchEvent(new Event('sn-saved', { bubbles: true }));
@@ -279,6 +291,7 @@ export function Form({
         }
       }}
       onChange={(e) => {
+        e.currentTarget.dataset.dirty = 'true';
         setSaved(false);
         (e.target as HTMLElement).removeAttribute('aria-invalid');
       }}
@@ -287,24 +300,33 @@ export function Form({
         <ErrorBox error={error} />
       </div>
       <div className="form-fields">
-        {fields.map((f) => (
-          <FieldControl
-            key={f.key}
-            field={f}
-            value={value[f.key]}
-            error={
-              error?.fields?.find((e: any) => e.path?.[0] === f.key)?.message ||
-              (error?.code === 'EMPLOYEE_CODE_EXISTS' && f.key === 'employee_code'
-                ? error.message
-                : undefined)
-            }
-            onChange={(v) => {
-              const next = { ...value, [f.key]: v };
-              setValue(next);
-              onChange?.(next);
-            }}
-          />
-        ))}
+        {fields.map((f) => {
+          const control = (
+            <FieldControl
+              key={f.key}
+              field={f}
+              value={value[f.key]}
+              error={
+                error?.fields?.find((e: any) => e.path?.[0] === f.key)?.message ||
+                (error?.code === 'EMPLOYEE_CODE_EXISTS' && f.key === 'employee_code'
+                  ? error.message
+                  : undefined)
+              }
+              onChange={(v) => {
+                const next = { ...value, [f.key]: v };
+                setValue(next);
+                onChange?.(next);
+              }}
+            />
+          );
+          return activeSection ? (
+            <div key={f.key} hidden={!!f.section && f.section !== activeSection}>
+              {control}
+            </div>
+          ) : (
+            control
+          );
+        })}
       </div>
       {childrenBeforeExtra && children}
       {extraFields.length > 0 && (

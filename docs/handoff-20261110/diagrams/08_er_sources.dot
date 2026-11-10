@@ -1,0 +1,23 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.4,ranksep=0.65];
+node [shape=box,style="rounded,filled",fillcolor="#f4f7f0",color="#a8bda2",fontname="DejaVu Sans",fontsize=11,margin="0.16,0.12"];
+edge [fontname="DejaVu Sans",fontsize=10,color="#57745d"];
+companies [label="companies\nuuid id [PK]\ntext code"];
+business_resources [label="business_resources\nuuid id [PK]\nuuid company_id [FK]\ntext kind"];
+metric_batches [label="metric_batches\nuuid id [PK]\nuuid resource_id [FK]\ntext checksum"];
+source_partitions [label="source_partitions\nuuid id [PK]\nuuid resource_id [FK]\nuuid current_revision_id [FK]"];
+source_revisions [label="source_revisions\nuuid id [PK]\nuuid partition_id [FK]\nuuid batch_id [FK]\ninteger revision"];
+sales_daily_facts [label="sales_daily_facts\nuuid id [PK]\nuuid source_revision_id [FK]\ndate business_date"];
+koc_period_facts [label="koc_period_facts\nuuid id [PK]\nuuid source_revision_id [FK]\ntext creator_key"];
+return_order_facts [label="return_order_facts\nuuid id [PK]\nuuid source_revision_id [FK]\ntext order_id"];
+return_sku_facts [label="return_sku_facts\nuuid id [PK]\nuuid order_fact_id [FK]\ntext sku_id"];
+companies -> business_resources [label="sở hữu"];
+business_resources -> metric_batches [label="file nguồn"];
+business_resources -> source_partitions [label="phân vùng"];
+source_partitions -> source_revisions [label="phiên bản"];
+metric_batches -> source_revisions [label="cung cấp"];
+source_revisions -> sales_daily_facts [label="ngày bán hàng"];
+source_revisions -> koc_period_facts [label="KOC theo kỳ"];
+source_revisions -> return_order_facts [label="cấp đơn"];
+return_order_facts -> return_sku_facts [label="SKU"];
+}

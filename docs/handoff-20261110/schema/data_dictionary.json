@@ -1,0 +1,2037 @@
+{
+  "baseline_commit": "217671e39b85221f5653e24c86640400ede074db",
+  "status": "TARGET_DESIGN_NOT_APPLIED",
+  "tables": [
+    {
+      "name": "users / grants / sessions",
+      "status": "KEEP",
+      "fields": [
+        {
+          "name": "users.id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK giữ nguyên"
+        },
+        {
+          "name": "users.username",
+          "type": "text",
+          "nullable": false,
+          "description": "Unique case-insensitive, giữ email legacy"
+        },
+        {
+          "name": "users.password_hash",
+          "type": "text",
+          "nullable": false,
+          "description": "Argon2id"
+        },
+        {
+          "name": "users.permission_version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Tăng khi thay quyền"
+        },
+        {
+          "name": "grants.kind/role/scope",
+          "type": "text",
+          "nullable": false,
+          "description": "Bundle của 5 ROLE"
+        },
+        {
+          "name": "grants.valid_from/valid_to",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Khoảng [from,to), to nullable"
+        }
+      ],
+      "constraints": [
+        "Không thêm bảng ROLE làm nguồn quyền song song. Derive UI profile từ grants.",
+        "Không sửa hash/ID để ánh xạ ROLE."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "tasks",
+      "status": "EXTEND",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK hiện có"
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users, owner hiện hành"
+        },
+        {
+          "name": "role",
+          "type": "text",
+          "nullable": false,
+          "description": "Job code của task, snapshot khi tạo"
+        },
+        {
+          "name": "flow_mode",
+          "type": "text",
+          "nullable": false,
+          "description": "NEW: LEGACY_REVIEW hoặc CHECKLIST; backfill legacy"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "description": "EXTEND WAITING; check theo flow_mode"
+        },
+        {
+          "name": "priority",
+          "type": "text",
+          "nullable": false,
+          "description": "NORMAL/URGENT hiện có"
+        },
+        {
+          "name": "due_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Hạn bắt buộc checklist"
+        },
+        {
+          "name": "company_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "NEW FK companies, optional với task chung"
+        },
+        {
+          "name": "resource_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "NEW FK business_resources cùng company"
+        },
+        {
+          "name": "completed_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Hoàn thành mới nhất"
+        },
+        {
+          "name": "cancelled_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "NEW khi hủy"
+        },
+        {
+          "name": "cancel_reason",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW lý do hủy, null khi chưa hủy"
+        },
+        {
+          "name": "result_text",
+          "type": "text",
+          "nullable": false,
+          "description": "Kết quả, bắt buộc DONE checklist"
+        },
+        {
+          "name": "approved_submission_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Null checklist; legacy giữ FK"
+        },
+        {
+          "name": "timing",
+          "type": "text",
+          "nullable": true,
+          "description": "ON_TIME/LATE khi DONE, theo due tại completion"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Optimistic concurrency"
+        }
+      ],
+      "constraints": [
+        "CHECKLIST chỉ WAITING/IN_PROGRESS/DONE/CANCELLED. LEGACY_REVIEW chỉ 9 trạng thái cũ.",
+        "Thay done_has_approved_submission bằng constraint phân nhánh flow_mode.",
+        "CHECKLIST DONE cần completed_at,timing,result_text không rỗng và approved_submission_id IS NULL. Legacy DONE vẫn phải có submission được duyệt.",
+        "CHECKLIST CANCELLED cần cancelled_at và trim(cancel_reason) không rỗng.",
+        "Index (owner_id,flow_mode,status,due_at,id); thêm index due cho active."
+      ],
+      "notes": "Không tạo bảng task_v2 hoặc fake submission để đi vòng constraint."
+    },
+    {
+      "name": "task_events / task_updates / owner_history",
+      "status": "KEEP",
+      "fields": [
+        {
+          "name": "task_events.id",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Event sequence ổn định"
+        },
+        {
+          "name": "task_events.data",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Bổ sung contract event_v2: before/after,owner_at_event,job_at_event,due_snapshot,reason"
+        },
+        {
+          "name": "task_events.created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server event time; business timestamp riêng trong data nếu cần"
+        },
+        {
+          "name": "task_updates.summary",
+          "type": "text",
+          "nullable": false,
+          "description": "Progress riêng, không biến system event thành chat"
+        },
+        {
+          "name": "owner_history.from_at/to_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Khoảng không chồng lấn theo task"
+        }
+      ],
+      "constraints": [
+        "Immutable task_events/task_updates như repo.",
+        "Task state update và event trong cùng transaction."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "companies",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK gen_random_uuid"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false,
+          "description": "Mã do Admin đặt"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "nullable": false,
+          "description": "Tên pháp nhân được xác nhận"
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": false,
+          "description": "Soft disable"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Expected version"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(lower(code)); không dùng text company trong file làm PK."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "business_resources",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "company_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK companies"
+        },
+        {
+          "name": "platform_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK platforms hiện có"
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "description": "SHOP/CHANNEL"
+        },
+        {
+          "name": "label",
+          "type": "text",
+          "nullable": false,
+          "description": "Tên UI"
+        },
+        {
+          "name": "external_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Mã shop/channel, nullable khi chưa cung cấp"
+        },
+        {
+          "name": "active",
+          "type": "boolean",
+          "nullable": false,
+          "description": "Cấm import mới khi disabled"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(id,company_id)",
+        "UNIQUE(company_id,platform_id,kind,external_id) khi external_id IS NOT NULL.",
+        "Disabled vẫn cho đọc lịch sử trong quyền."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "resource_grants",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "resource_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK business_resources"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        },
+        {
+          "name": "permission",
+          "type": "text",
+          "nullable": false,
+          "description": "READ/WRITE; WRITE bao gồm READ"
+        },
+        {
+          "name": "valid_from",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Bắt đầu"
+        },
+        {
+          "name": "valid_to",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Hết hiệu lực"
+        },
+        {
+          "name": "revoked_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Thu hồi"
+        },
+        {
+          "name": "granted_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users Admin"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false,
+          "description": "Lý do không chứa secret"
+        }
+      ],
+      "constraints": [
+        "valid_to > valid_from nếu có; kiểm quyền hiện tại mỗi request.",
+        "Không có grant chồng lấn cùng user/resource/permission; lock khi cấp."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "metric_batches",
+      "status": "EXTEND",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK hiện có"
+        },
+        {
+          "name": "company_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "NEW FK companies; legacy null đến khi map"
+        },
+        {
+          "name": "resource_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "NEW FK business_resources"
+        },
+        {
+          "name": "adapter_code",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW 5 loại; legacy null"
+        },
+        {
+          "name": "adapter_version",
+          "type": "integer",
+          "nullable": true,
+          "description": "NEW bản mapping cố định"
+        },
+        {
+          "name": "period_start/period_end",
+          "type": "date",
+          "nullable": true,
+          "description": "NEW kỳ inclusive của nguồn"
+        },
+        {
+          "name": "period_basis",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW DAILY/EXPORT_PERIOD/SNAPSHOT/DATE_CREATED/DATE_CANCELLED"
+        },
+        {
+          "name": "source_context",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "NEW sheet/header/locale/precision/confirmation refs"
+        },
+        {
+          "name": "canonical_hash",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW SHA256 normalized facts"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "description": "UPLOADED/INVALID/PREVIEWED/COMMITTED/ABORTED; map legacy hiện có"
+        },
+        {
+          "name": "preview_hash / version",
+          "type": "text / integer",
+          "nullable": false,
+          "description": "Giữ đồng bộ preview và commit"
+        },
+        {
+          "name": "owner_id / checksum / storage_key",
+          "type": "existing",
+          "nullable": false,
+          "description": "Uploader provenance và file gốc"
+        }
+      ],
+      "constraints": [
+        "Unique raw-checksum scoped company+resource+adapter; legacy unique(platform,shop,kind,checksum) phải review để không chặn hai company khác nhau.",
+        "Commit mới cần tất cả metadata V2 đầy đủ. Không backfill guessed resource."
+      ],
+      "notes": "Typed facts V2 bên dưới là nguồn báo cáo mới; metrics EAV cũ giữ legacy, không dual-write cùng chỉ tiêu vào cả hai rồi SUM."
+    },
+    {
+      "name": "import_errors",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "bigint",
+          "nullable": false,
+          "description": "PK identity"
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK metric_batches"
+        },
+        {
+          "name": "preview_version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Phiên kiểm tra"
+        },
+        {
+          "name": "sheet",
+          "type": "text",
+          "nullable": true,
+          "description": "Tên sheet"
+        },
+        {
+          "name": "row_number",
+          "type": "integer",
+          "nullable": true,
+          "description": "1-based"
+        },
+        {
+          "name": "column_name",
+          "type": "text",
+          "nullable": true,
+          "description": "Header nguồn"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "nullable": false,
+          "description": "BLOCKING/WARNING và error code"
+        },
+        {
+          "name": "severity",
+          "type": "text",
+          "nullable": false,
+          "description": "BLOCKING/WARNING và error code"
+        },
+        {
+          "name": "raw_value_redacted",
+          "type": "text",
+          "nullable": true,
+          "description": "Giá trị lỗi không có buyerPII/secret"
+        },
+        {
+          "name": "message_vi",
+          "type": "text",
+          "nullable": false,
+          "description": "Hướng khắc phục"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        }
+      ],
+      "constraints": [
+        "Không lưu địa chỉ/số điện thoại người mua vào errorlog."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "import_confirmations",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK metric_batches"
+        },
+        {
+          "name": "batch_version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Bind preview"
+        },
+        {
+          "name": "confirmed_metadata",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Nguồn/kỳ/năm/giờ/locale do người dùng xác nhận"
+        },
+        {
+          "name": "metadata_hash",
+          "type": "text",
+          "nullable": false,
+          "description": "SHA256"
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        }
+      ],
+      "constraints": [
+        "Append-only; đổi metadata phải tạo confirmation và preview mới."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "source_partitions",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "company_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK companies"
+        },
+        {
+          "name": "resource_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK resource cùng company"
+        },
+        {
+          "name": "adapter_code",
+          "type": "text",
+          "nullable": false,
+          "description": "Adapter"
+        },
+        {
+          "name": "grain",
+          "type": "text",
+          "nullable": false,
+          "description": "DAY/PERIOD/SNAPSHOT/WINDOW"
+        },
+        {
+          "name": "basis",
+          "type": "text",
+          "nullable": false,
+          "description": "Cohort/time basis"
+        },
+        {
+          "name": "attribution_key",
+          "type": "text",
+          "nullable": false,
+          "description": "Định nghĩa nguồn; NONE khi không áp dụng"
+        },
+        {
+          "name": "period_start",
+          "type": "date",
+          "nullable": false,
+          "description": "Kỳ inclusive (snapshot cùng ngày)"
+        },
+        {
+          "name": "period_end",
+          "type": "date",
+          "nullable": false,
+          "description": "Kỳ inclusive (snapshot cùng ngày)"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false,
+          "description": "VND/..."
+        },
+        {
+          "name": "current_revision_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK composite tới revision cùng partition"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Pointer concurrency"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(company_id,resource_id,adapter_code,grain,basis,attribution_key,period_start,period_end,currency).",
+        "Active period overlap cùngseries phải chặn bằng advisory lock + query trong transaction SERIALIZABLE; exact-range replace được phép."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "source_revisions",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "partition_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK source_partitions"
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false,
+          "description": "Tăng dần"
+        },
+        {
+          "name": "batch_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK metric_batches"
+        },
+        {
+          "name": "previous_revision_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Cùng partition, nullable lần đầu"
+        },
+        {
+          "name": "canonical_hash",
+          "type": "text",
+          "nullable": false,
+          "description": "Hash facts"
+        },
+        {
+          "name": "confirmation_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK import_confirmations nếu cần"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false,
+          "description": "Bắt buộc khi thay nguồn"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(partition_id,revision); UNIQUE(partition_id,id); immutable.",
+        "Pointerpartition FK(partition_id,current_revision_id) DEFERRABLE; revision previous FK cùngpartition."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "sales_daily_facts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "source_revision_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK source_revisions"
+        },
+        {
+          "name": "business_date",
+          "type": "date",
+          "nullable": false,
+          "description": "Ngày"
+        },
+        {
+          "name": "revenue",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "Doanh thu"
+        },
+        {
+          "name": "effective_revenue",
+          "type": "numeric(28,10)",
+          "nullable": true,
+          "description": "Nguồn riêng"
+        },
+        {
+          "name": "orders",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Tổng đơn"
+        },
+        {
+          "name": "cancelled_orders",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Đơn hủy"
+        },
+        {
+          "name": "refunded_orders",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Đơn hoàn tiền"
+        },
+        {
+          "name": "refund_amount",
+          "type": "numeric(28,10)",
+          "nullable": true,
+          "description": "Tiền hoàn"
+        },
+        {
+          "name": "cancelled_amount",
+          "type": "numeric(28,10)",
+          "nullable": true,
+          "description": "Tiền hủy"
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "nullable": false,
+          "description": "Dòng gốc"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(source_revision_id,business_date)",
+        "Tất cả count >=0; tiền nguồn hiện có >=0. Không áp dụng refunded+cancelled<=orders vì có thể overlap; warning nếu từngcount>orders.",
+        "Fact date nằm trong partition. Immutable."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "koc_period_facts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "source_revision_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK revision"
+        },
+        {
+          "name": "creator_key",
+          "type": "text",
+          "nullable": false,
+          "description": "Handle normalized có quy tắc giữ dấu"
+        },
+        {
+          "name": "creator_name_raw",
+          "type": "text",
+          "nullable": false,
+          "description": "Tên gốc"
+        },
+        {
+          "name": "gmv",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "GMV nguồn"
+        },
+        {
+          "name": "orders",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Đơn nguồn"
+        },
+        {
+          "name": "refund_amount",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "Hoàn tiền"
+        },
+        {
+          "name": "estimated_commission",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "Hoa hồng ước tính"
+        },
+        {
+          "name": "refunded_items",
+          "type": "bigint",
+          "nullable": true,
+          "description": "Số món hoàn, không phải đơn"
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "nullable": false,
+          "description": "Dòng nguồn"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(source_revision_id,creator_key); duplicate creator trong file → error, không tựSUM.",
+        "Không có paid_commission/cancelled_orders nếu chưa có source. Immutable."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "return_order_facts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "source_revision_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK revision"
+        },
+        {
+          "name": "order_id",
+          "type": "text",
+          "nullable": false,
+          "description": "ID text, không numeric"
+        },
+        {
+          "name": "status_raw",
+          "type": "text",
+          "nullable": false,
+          "description": "Giá trị gốc"
+        },
+        {
+          "name": "type_raw",
+          "type": "text",
+          "nullable": false,
+          "description": "Giá trị gốc"
+        },
+        {
+          "name": "normalized_type",
+          "type": "text",
+          "nullable": false,
+          "description": "CANCEL/RETURN_REFUND sau mapping xác minh"
+        },
+        {
+          "name": "order_amount",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "Giá trị một lần cấp đơn"
+        },
+        {
+          "name": "refund_amount",
+          "type": "numeric(28,10)",
+          "nullable": false,
+          "description": "Giá trị một lần cấp đơn"
+        },
+        {
+          "name": "created_at_source",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Ngày tạo đơn nguồn"
+        },
+        {
+          "name": "cancelled_at_source",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Có thể null"
+        },
+        {
+          "name": "creator_handle",
+          "type": "text",
+          "nullable": true,
+          "description": "Nếu có"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(source_revision_id,order_id); nếu dòngSKU cùngđơn tiền khác nhau thì rejectbatch. Immutable."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "return_sku_facts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "order_fact_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK return_order_facts"
+        },
+        {
+          "name": "sku_id",
+          "type": "text",
+          "nullable": true,
+          "description": "ID nguồn"
+        },
+        {
+          "name": "seller_sku",
+          "type": "text",
+          "nullable": true,
+          "description": "ID nguồn"
+        },
+        {
+          "name": "package_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Nguồn"
+        },
+        {
+          "name": "variation",
+          "type": "text",
+          "nullable": true,
+          "description": "Nguồn"
+        },
+        {
+          "name": "quantity",
+          "type": "numeric(18,4)",
+          "nullable": true,
+          "description": "Count theo SKU nếu có"
+        },
+        {
+          "name": "returned_quantity",
+          "type": "numeric(18,4)",
+          "nullable": true,
+          "description": "Count theo SKU nếu có"
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "nullable": false,
+          "description": "Dòng gốc"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(order_fact_id,source_row). Không chứa tiền cấp đơn lặp. Immutable."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "content_items",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK đồng thời FK records.id kind CONTENT"
+        },
+        {
+          "name": "owner_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": false,
+          "description": "SCRIPTING/WAITING_SHOOT/WAITING_EDIT/CLIP_READY"
+        },
+        {
+          "name": "writer_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK users, nullable khi chưa phân công"
+        },
+        {
+          "name": "camera_operator_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK users, nullable khi chưa phân công"
+        },
+        {
+          "name": "editor_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK users, nullable khi chưa phân công"
+        },
+        {
+          "name": "script_text",
+          "type": "text",
+          "nullable": false,
+          "description": "Lời thoại"
+        },
+        {
+          "name": "shoot_location",
+          "type": "text",
+          "nullable": true,
+          "description": "Địa điểm"
+        },
+        {
+          "name": "scheduled_shoot_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Mốc dự kiến/thực tế"
+        },
+        {
+          "name": "actual_shot_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Mốc dự kiến/thực tế"
+        },
+        {
+          "name": "edited_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Mốc dự kiến/thực tế"
+        },
+        {
+          "name": "due_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Hạn nội dung"
+        },
+        {
+          "name": "script_asset_ids",
+          "type": "uuid[]",
+          "nullable": true,
+          "description": "File private thuộc content; service kiểm FK assets"
+        },
+        {
+          "name": "raw_asset_ids",
+          "type": "uuid[]",
+          "nullable": true,
+          "description": "File private thuộc content; service kiểm FK assets"
+        },
+        {
+          "name": "final_asset_ids",
+          "type": "uuid[]",
+          "nullable": true,
+          "description": "File private thuộc content; service kiểm FK assets"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Optimistic version"
+        }
+      ],
+      "constraints": [
+        "records giữ title/company và liên kết legacy. Extension là nguồn canonical V2, payloadlegacy chỉ đọc.",
+        "Cùng records.id không có hai contenttypedrow. Không phát sinh bảng taskcopy."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "content_participants",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "content_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK content_items"
+        },
+        {
+          "name": "participant_role",
+          "type": "text",
+          "nullable": false,
+          "description": "ACTOR/CAMERA/EDITOR/SUPPORT"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Nội bộ"
+        },
+        {
+          "name": "external_name",
+          "type": "text",
+          "nullable": true,
+          "description": "Ngoài công ty"
+        },
+        {
+          "name": "note",
+          "type": "text",
+          "nullable": true,
+          "description": "Ghi chú"
+        }
+      ],
+      "constraints": [
+        "CHECK đúng một user_id hoặc external_name không rỗng.",
+        "Unique(content_id,participant_role,user_id) khi nội bộ; không auto-create user."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "content_stage_events",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "content_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK content_items"
+        },
+        {
+          "name": "stage_code",
+          "type": "text",
+          "nullable": false,
+          "description": "SCRIPT/SHOOT/EDIT"
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "description": "COMPLETE/CORRECT/REOPEN"
+        },
+        {
+          "name": "business_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Mốc nghiệp vụ"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Mốc ghi nhận"
+        },
+        {
+          "name": "actor_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "Người thao tác và người được ghi nhận"
+        },
+        {
+          "name": "credited_user_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "Người thao tác và người được ghi nhận"
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false,
+          "description": "Phiên bản logical completion của stage"
+        },
+        {
+          "name": "supersedes_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Event cùngcontent/stage"
+        },
+        {
+          "name": "snapshot",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Phân công, file, trạng thái tại event"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false,
+          "description": "Bắt buộc correction/reopen"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(content_id,stage_code,revision); immutable; validate supersedes samecontent/stage."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "publications",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK/FK records.id kind PUBLICATION"
+        },
+        {
+          "name": "content_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK content_items; null chỉ với HISTORICAL_IMPORT chưa liên kết"
+        },
+        {
+          "name": "channel_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK business_resources.kind CHANNEL"
+        },
+        {
+          "name": "platform_video_id",
+          "type": "text",
+          "nullable": true,
+          "description": "Nếu trích được"
+        },
+        {
+          "name": "original_url",
+          "type": "text",
+          "nullable": false,
+          "description": "URL gốc và chuẩn hóa"
+        },
+        {
+          "name": "canonical_url",
+          "type": "text",
+          "nullable": false,
+          "description": "URL gốc và chuẩn hóa"
+        },
+        {
+          "name": "published_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Có thể null khi nguồn chưa đầy đủ"
+        },
+        {
+          "name": "published_precision",
+          "type": "text",
+          "nullable": false,
+          "description": "SECOND/MINUTE/DATE/UNKNOWN"
+        },
+        {
+          "name": "publisher_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "FK users; null chỉ với HISTORICAL_IMPORT chưa liên kết"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        },
+        {
+          "name": "origin",
+          "type": "text",
+          "nullable": false,
+          "description": "MANAGED/HISTORICAL_IMPORT; MANAGED cần content_id và publisher_id"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(channel_id,canonical_url); UNIQUE(channel_id,platform_video_id) khi ID có.",
+        "D7 cần precision ít nhất MINUTE và published_at được xác nhận."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "video_snapshots",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "publication_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK publications"
+        },
+        {
+          "name": "source_revision_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK source_revisions"
+        },
+        {
+          "name": "collected_at",
+          "type": "timestamptz",
+          "nullable": true,
+          "description": "Nullable khi chỉ có rawdate"
+        },
+        {
+          "name": "collected_precision",
+          "type": "text",
+          "nullable": false,
+          "description": "MINUTE/DATE/UNKNOWN"
+        },
+        {
+          "name": "published_raw",
+          "type": "text",
+          "nullable": false,
+          "description": "Ngày nguyên văn"
+        },
+        {
+          "name": "collected_raw",
+          "type": "text",
+          "nullable": false,
+          "description": "Ngày nguyên văn"
+        },
+        {
+          "name": "views",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Nguồn khôngâm"
+        },
+        {
+          "name": "likes",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Nguồn khôngâm"
+        },
+        {
+          "name": "comments",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Nguồn khôngâm"
+        },
+        {
+          "name": "shares",
+          "type": "bigint",
+          "nullable": false,
+          "description": "Nguồn khôngâm"
+        },
+        {
+          "name": "date_confirmation_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Xác nhận ngày nếu có"
+        },
+        {
+          "name": "source_row",
+          "type": "integer",
+          "nullable": false,
+          "description": "Dòng gốc"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(publication_id,source_revision_id); immutable. Unknownpublicationmatching phải userlink, không theo title."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "video_window_facts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "publication_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK publications"
+        },
+        {
+          "name": "source_revision_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK source"
+        },
+        {
+          "name": "window_start",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Cửa sổ half-open thật"
+        },
+        {
+          "name": "window_end",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Cửa sổ half-open thật"
+        },
+        {
+          "name": "metric",
+          "type": "text",
+          "nullable": false,
+          "description": "GMV/VIEWS/LIKES/COMMENTS/SHARES"
+        },
+        {
+          "name": "value",
+          "type": "numeric(28,10)",
+          "nullable": true,
+          "description": "Null nếu thiếu, córeason"
+        },
+        {
+          "name": "missing_reason",
+          "type": "text",
+          "nullable": true,
+          "description": "Lý do thiếu"
+        },
+        {
+          "name": "attribution_key",
+          "type": "text",
+          "nullable": false,
+          "description": "Định nghĩa của nguồn"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false,
+          "description": "Cho GMV; NONEcho counts"
+        },
+        {
+          "name": "window_verified",
+          "type": "boolean",
+          "nullable": false,
+          "description": "Không true nếu chỉ nhập nhãn D7"
+        }
+      ],
+      "constraints": [
+        "window_end>window_start; value OR missing_reason; unique(publication,source_revision,window,metric,attribution).",
+        "D7 gate kiểm cửa sổ168h exact và provenance, không chỉ window_verified của client. Immutable."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "candidate_profiles",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK/FK records.id kind CANDIDATE"
+        },
+        {
+          "name": "birthday",
+          "type": "date",
+          "nullable": true,
+          "description": "Tùy cung cấp"
+        },
+        {
+          "name": "contact",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Phone/email HR-only"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        }
+      ],
+      "constraints": [
+        "Tên ởrecords.title; CVasset record_id=candidateid. Không duplicate person."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "job_applications",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK/FK records.id kind APPLICATION"
+        },
+        {
+          "name": "candidate_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK candidate_profiles"
+        },
+        {
+          "name": "position_code",
+          "type": "text",
+          "nullable": false,
+          "description": "MARKETPLACE/HR/CONTENT"
+        },
+        {
+          "name": "received_on",
+          "type": "date",
+          "nullable": false,
+          "description": "Ngày nhận"
+        },
+        {
+          "name": "recruiter_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FKusers"
+        },
+        {
+          "name": "stage",
+          "type": "text",
+          "nullable": false,
+          "description": "NEW/INTERVIEW/EVALUATING/OFFER/HIRED/REJECTED"
+        },
+        {
+          "name": "source",
+          "type": "text",
+          "nullable": false,
+          "description": "Nguồn và bước tới"
+        },
+        {
+          "name": "next_action",
+          "type": "text",
+          "nullable": false,
+          "description": "Nguồn và bước tới"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(id,candidate_id); nhiềuapplicationcùngcandidate được phép."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "interview_sessions",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK/FK records.id kind INTERVIEW"
+        },
+        {
+          "name": "application_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK job_applications"
+        },
+        {
+          "name": "starts_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Bắt đầu/kếtthúc"
+        },
+        {
+          "name": "ends_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Bắt đầu/kếtthúc"
+        },
+        {
+          "name": "location",
+          "type": "text",
+          "nullable": false,
+          "description": "Địađiểm/link họp"
+        },
+        {
+          "name": "outcome",
+          "type": "text",
+          "nullable": false,
+          "description": "Nhậnxét HR-only"
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "nullable": false,
+          "description": "Nhậnxét HR-only"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        }
+      ],
+      "constraints": [
+        "ends_at>starts_at; người phỏngvấn ởbảnginterview_users."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "interview_users",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "interview_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK interview_sessions"
+        },
+        {
+          "name": "user_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "PK(interview_id,user_id)."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "candidate_employee_links",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "application_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK/FK job_applications"
+        },
+        {
+          "name": "candidate_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK candidate_profiles"
+        },
+        {
+          "name": "employee_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "Unique FK employee_profiles"
+        },
+        {
+          "name": "accepted_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Mốc nhậnviệc"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "Actor HR/Admin"
+        }
+      ],
+      "constraints": [
+        "CompositeFK(application_id,candidate_id)→job_applications(id,candidate_id).",
+        "Retry tạo cùnglink trảexistingemployee; không2profile."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "employee_contracts",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "employee_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK employee_profiles"
+        },
+        {
+          "name": "current_revision_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Pointer samecontract"
+        },
+        {
+          "name": "supersedes_contract_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Hợpđồng trước cùngemployee"
+        },
+        {
+          "name": "version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Concurrency"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(employee_id,id); previous compositeFK cùngemployee; khôngtựtrỏ."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "employee_contract_revisions",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "contract_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK employee_contracts"
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false,
+          "description": "Phiênbản"
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "nullable": false,
+          "description": "Số; PROBATION/OFFICIAL/EXTENSION/ADDENDUM; DRAFT/SIGNED/ACTIVE/EXPIRED/SUPERSEDED"
+        },
+        {
+          "name": "kind",
+          "type": "text",
+          "nullable": false,
+          "description": "Số; PROBATION/OFFICIAL/EXTENSION/ADDENDUM; DRAFT/SIGNED/ACTIVE/EXPIRED/SUPERSEDED"
+        },
+        {
+          "name": "status",
+          "type": "text",
+          "nullable": false,
+          "description": "Số; PROBATION/OFFICIAL/EXTENSION/ADDENDUM; DRAFT/SIGNED/ACTIVE/EXPIRED/SUPERSEDED"
+        },
+        {
+          "name": "signed_on",
+          "type": "date",
+          "nullable": false,
+          "description": "Mốc"
+        },
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "description": "Mốc"
+        },
+        {
+          "name": "expires_on",
+          "type": "date",
+          "nullable": true,
+          "description": "Null khôngxácđịnhthời hạn"
+        },
+        {
+          "name": "asset_ids",
+          "type": "uuid[]",
+          "nullable": false,
+          "description": "File phảithuộc employee"
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "nullable": false,
+          "description": "Lýdo bảnmới"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(contract_id,revision); UNIQUE(contract_id,id); expires_on>=effective_from nếu có; immutable.",
+        "contract current pointer FK(id,current_revision_id)→revisions(contract_id,id) DEFERRABLE."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "employee_salary_terms",
+      "status": "NEW",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "PK"
+        },
+        {
+          "name": "employee_id",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK employee_profiles"
+        },
+        {
+          "name": "phase",
+          "type": "text",
+          "nullable": false,
+          "description": "PROBATION/OFFICIAL"
+        },
+        {
+          "name": "effective_from",
+          "type": "date",
+          "nullable": false,
+          "description": "Ngày hiệu lực"
+        },
+        {
+          "name": "revision",
+          "type": "integer",
+          "nullable": false,
+          "description": "Cùng mốc correction"
+        },
+        {
+          "name": "currency",
+          "type": "text",
+          "nullable": false,
+          "description": "VND/..."
+        },
+        {
+          "name": "encrypted_payload",
+          "type": "text",
+          "nullable": false,
+          "description": "AES-GCM JSON{amount decimalstring,gross_or_net,basis,note,reason}"
+        },
+        {
+          "name": "supersedes_id",
+          "type": "uuid",
+          "nullable": true,
+          "description": "Term trước cùngemployee+phase+date, null lầnđầu"
+        },
+        {
+          "name": "change_reason_code",
+          "type": "text",
+          "nullable": false,
+          "description": "Không chứaamount hoặcPII"
+        },
+        {
+          "name": "created_at",
+          "type": "timestamptz",
+          "nullable": false,
+          "description": "Server clock"
+        },
+        {
+          "name": "created_by",
+          "type": "uuid",
+          "nullable": false,
+          "description": "FK users"
+        }
+      ],
+      "constraints": [
+        "UNIQUE(employee_id,phase,effective_from,revision); immutable.",
+        "revision1 tạo mốc; correction revision+1 sameemployee/phase/date. Term superseded vẫnđọc được trongquyền."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "report_revisions / reports / report_drafts",
+      "status": "KEEP",
+      "fields": [
+        {
+          "name": "reports.user_id/period",
+          "type": "uuid / date",
+          "nullable": false,
+          "description": "Uniquecontainer"
+        },
+        {
+          "name": "report_revisions.snapshot",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "schema_version=2; taskeventattribution; modulefacts; availabilities"
+        },
+        {
+          "name": "report_revisions.recipients",
+          "type": "uuid[]",
+          "nullable": false,
+          "description": "Sếpactive lúcsubmit"
+        },
+        {
+          "name": "snapshot.source_manifest",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "partition_id/revision_id/batch_hash/event_ids/policy_version"
+        },
+        {
+          "name": "report_drafts.version",
+          "type": "integer",
+          "nullable": false,
+          "description": "Khôngđọc nhápcủangườikhác"
+        }
+      ],
+      "constraints": [
+        "Không UPDATE/DELETE snapshot cũ. Revisionv1 vẫn đọc bằngrendererlegacy."
+      ],
+      "notes": ""
+    },
+    {
+      "name": "notifications / outbox / settings",
+      "status": "EXTEND",
+      "fields": [
+        {
+          "name": "notifications.object_type / event_type / action_path",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW, legacy nullable"
+        },
+        {
+          "name": "outbox.object_type / event_type / action_path",
+          "type": "text",
+          "nullable": true,
+          "description": "NEW corresponding payload"
+        },
+        {
+          "name": "settings.policies",
+          "type": "jsonb",
+          "nullable": false,
+          "description": "Nhắc7/3,30/7,birthday,week/hạn; settings_history"
+        },
+        {
+          "name": "event_key",
+          "type": "text",
+          "nullable": false,
+          "description": "Unique(user_id,event_key) giữrepo"
+        }
+      ],
+      "constraints": [
+        "Không nhét secret/lương/địnhdanh trongnotificationpayload.",
+        "Deep-link phải servervalidate đườngdẫn vàquyền object; khôngopenredirect."
+      ],
+      "notes": ""
+    }
+  ]
+}

@@ -19,6 +19,8 @@ import {
 import { employeeRevision } from './employee-history.js';
 import { hrAccess, sensitiveAllowed, payrollAllowed } from './employees.js';
 import { taskAccess } from './tasks.js';
+import { contentAccess } from './content.js';
+import { hrV2 } from './handoff-access.js';
 export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
   const r = await one(
     c,
@@ -26,6 +28,15 @@ export async function recordAccess(c: DB, a: Actor, id: string, lock = false) {
     [id],
   );
   need(r, 'Không tìm thấy hồ sơ', 404, 'NOT_FOUND');
+  if (r.module === 'hr' && hrV2(a)) return r;
+  if (await one(c, 'SELECT id FROM content_items WHERE id=$1', [id])) {
+    await contentAccess(c, a, id);
+    return r;
+  }
+  if (await one(c, 'SELECT id FROM candidate_profiles WHERE id=$1', [id])) {
+    need(hrV2(a), 'Không tìm thấy hồ sơ', 404, 'NOT_FOUND');
+    return r;
+  }
   need(
     isAdmin(a) ||
       (hasJob(a, r.role) &&
@@ -127,7 +138,16 @@ export function fileRoutes(api: API) {
       );
     } else {
       const r = await recordAccess(c, a, v.record_id!);
-      need(r.owner_id === a.id || isAdmin(a));
+      need(
+        r.owner_id === a.id ||
+          isAdmin(a) ||
+          (r.module === 'hr' && hrV2(a)) ||
+          !!(await one(
+            c,
+            'SELECT id FROM content_items WHERE id=$1 AND (writer_id=$2 OR camera_operator_id=$2 OR editor_id=$2)',
+            [r.id, a.id],
+          )),
+      );
       role = r.role;
     }
     const ext = extname(b.filename).slice(1).toLowerCase(),

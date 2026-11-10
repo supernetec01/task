@@ -1,0 +1,1 @@
+2026-11-10: current API port 3002 and isolated restore API port 3012 both returned health OK and accepted login plus authenticated GET /api/v1/tasks?v2=1. No credentials included. Worker log: worker_started, no worker_failed in the current run. Restored vault decrypted; 8 asset SHA-256 values matched. Original 5 XLSX SHA-256 values match the supplied manifest.

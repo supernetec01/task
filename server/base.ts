@@ -127,13 +127,13 @@ export async function scopeUser(c: DB, a: Actor, id: string) {
   need(u && (id === a.id || manages(a, u)));
   return u;
 }
-export const version = (v: any, expected: any) =>
-  need(
-    Number.isInteger(expected) && v.version === expected,
-    'Dữ liệu vừa thay đổi. Giữ nội dung và tải lại bản mới.',
-    409,
-    'VERSION_CONFLICT',
-  );
+export const version = (v: any, expected: any) => {
+  if (!Number.isInteger(expected) || v.version !== expected)
+    throw Object.assign(
+      new Fault(409, 'VERSION_CONFLICT', 'Dữ liệu vừa thay đổi. Giữ nội dung và tải lại bản mới.'),
+      { current_version: v.version },
+    );
+};
 export const setting = async (c: DB, k: string) =>
   (await one(c, 'SELECT value FROM settings WHERE key=$1', [k]))?.value || {};
 export async function audit(
@@ -161,11 +161,25 @@ export async function notify(
   );
 }
 export async function event(c: DB, a: Actor | null, t: string, action: string, data: unknown = {}) {
+  const current = await one(
+    c,
+    'SELECT owner_id,role,due_at,timing,completed_at FROM tasks WHERE id=$1',
+    [t],
+  );
+  const detail = {
+    event_version: 2,
+    owner_at_event: current?.owner_id,
+    job_at_event: current?.role,
+    due_snapshot: current?.due_at,
+    timing_at_event: current?.timing,
+    completed_at_event: current?.completed_at,
+    ...(data as object),
+  };
   await c.query('INSERT INTO task_events(task_id,actor_id,action,data) VALUES($1,$2,$3,$4)', [
     t,
     a?.id || null,
     action,
-    JSON.stringify(data),
+    JSON.stringify(detail),
   ]);
   await audit(c, a, action, 'task', t);
 }

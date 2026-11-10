@@ -1,0 +1,30 @@
+{"status":"FINGERPRINT_SAVED","tables":{"users":22,"grants":42,"tasks":144,"task_events":73,"task_updates":10,"owner_history":29,"submissions":8,"reviews":3,"report_revisions":5,"assets":8,"credential_versions":9,"employee_profiles":5,"employee_revisions":19,"metrics":15,"metric_batches":7},"role_mapping_required":[{"kind":"ACCESS","role":"EXECUTIVE","scope":"ALL","count":1},{"kind":"ACCESS","role":"MANAGER","scope":"TEAM","count":1},{"kind":"JOB","role":"ADS","scope":"SELF","count":1}]}
+
+> supernet-workspace@1.0.0 migrate
+> tsx server/cli.ts migrate
+
+Migration: 010.sql
+{
+  "status": "UNCHANGED",
+  "differences": [],
+  "role_mapping_required": [
+    {
+      "kind": "ACCESS",
+      "role": "EXECUTIVE",
+      "scope": "ALL",
+      "count": 1
+    },
+    {
+      "kind": "ACCESS",
+      "role": "MANAGER",
+      "scope": "TEAM",
+      "count": 1
+    },
+    {
+      "kind": "JOB",
+      "role": "ADS",
+      "scope": "SELF",
+      "count": 1
+    }
+  ]
+}

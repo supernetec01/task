@@ -1,0 +1,39 @@
+erDiagram
+  users {
+    uuid id PK
+    text username
+    integer permission_version
+  }
+  grants {
+    uuid id PK
+    uuid user_id FK
+    text role
+    text scope
+  }
+  tasks {
+    uuid id PK
+    uuid owner_id FK
+    text flow_mode
+    text status
+    timestamp due_at
+  }
+  task_events {
+    bigint id PK
+    uuid task_id FK
+    jsonb data
+  }
+  reports {
+    uuid id PK
+    uuid user_id FK
+    date period
+  }
+  report_revisions {
+    uuid id PK
+    uuid report_id FK
+    jsonb snapshot
+  }
+  users ||--o{ grants : "cấp quyền"
+  users ||--o{ tasks : "phụ trách"
+  tasks ||--o{ task_events : "ghi thay đổi"
+  users ||--o{ reports : "nộp tuần"
+  reports ||--o{ report_revisions : "nhiều bản nộp"

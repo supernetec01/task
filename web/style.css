@@ -1313,3 +1313,37 @@ textarea[aria-invalid='true'] {
   flex: 0 0 auto;
   padding: 12px 14px;
 }
+.handoff-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+.handoff-cards > button {
+  text-align: left;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 16px;
+  padding: 16px 0;
+}
+.form-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.tablewrap {
+  max-width: 100%;
+}
+.panel details {
+  padding: 12px 0;
+}
+.panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+article p {
+  overflow-wrap: anywhere;
+}

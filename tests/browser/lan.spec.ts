@@ -38,6 +38,9 @@ test('HTTP LAN renders login, authenticates and persists a task without randomUU
   await expect(
     page.getByRole('heading', { name: 'Tổng quan công việc', exact: true }),
   ).toBeVisible();
+  if (await page.getByRole('button', { name: 'Mở menu' }).isVisible())
+    await page.getByRole('button', { name: 'Mở menu' }).click();
+  await page.locator('.sidebar').getByRole('button', { name: 'Công việc cũ', exact: true }).click();
   await page.getByRole('button', { name: '+ Thêm việc phát sinh', exact: true }).click();
   const dialog = page.getByRole('dialog');
   const title = 'LAN regression ' + info.project.name + ' ' + Date.now();

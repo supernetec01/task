@@ -317,6 +317,7 @@ function EmployeeEditor({
     {
       key: 'team_id',
       label: 'Bộ phận',
+      required: !employee,
       type: 'select',
       options: (data?.teams || []).map((t: any) => ({ value: t.id, label: t.name })),
     },
@@ -335,6 +336,7 @@ function EmployeeEditor({
     {
       key: 'phase',
       label: 'Giai đoạn công việc',
+      readonly: !!employee,
       type: 'select',
       required: true,
       options: options(['PROBATION', 'OFFICIAL'], phaseNames),
@@ -609,6 +611,32 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                 {e.capabilities.provision_user && (
                   <button onClick={() => setProvision(true)}>Cấp tài khoản cho nhân viên</button>
                 )}
+                {e.capabilities.edit && e.employment_state === 'PROBATION' && (
+                  <details>
+                    <summary>Chuyển sang chính thức</summary>
+                    <Form
+                      fields={[
+                        {
+                          key: 'date',
+                          label: 'Ngày chính thức có hiệu lực',
+                          type: 'date',
+                          required: true,
+                        },
+                        { key: 'reason', label: 'Căn cứ chuyển chính thức', required: true },
+                      ]}
+                      onSubmit={async (v) => {
+                        await api('/employees/' + id + '/employment', {
+                          ...v,
+                          phase: 'OFFICIAL',
+                          expected_version: e.version,
+                        });
+                        setNotice('Đã ghi nhận chuyển chính thức.');
+                        refresh();
+                      }}
+                      label="Xác nhận chuyển chính thức"
+                    />
+                  </details>
+                )}
                 <h3>Vị trí công việc</h3>
                 {e.positions.map((p: any) => (
                   <p key={p.id}>
@@ -760,7 +788,11 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                 key,
               );
               setLeave(false);
-              setNotice('Đã lưu trữ và thu hồi quyền đăng nhập.');
+              setNotice(
+                v.left_on > new Date(Date.now() + 7 * 3600e3).toISOString().slice(0, 10)
+                  ? 'Đã lưu ngày nghỉ dự kiến; tài khoản vẫn hoạt động.'
+                  : 'Đã lưu trữ và thu hồi quyền đăng nhập.',
+              );
               refresh();
             }}
             label="Xác nhận nghỉ việc"

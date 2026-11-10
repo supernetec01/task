@@ -1,0 +1,19 @@
+flowchart TD
+  A["Tổng hợp task events và nguồn đúng kỳ"]
+  M{"Thiếu nguồn / chưa xác nhận?"}
+  N["Metric null + availability + cảnh báo"]
+  D["Nháp riêng + nhận xét + kế hoạch"]
+  V{"Kiểm version / quyền / người nhận Sếp"}
+  E["Giữ nháp; báo lỗi cụ thể"]
+  S["Transaction snapshot revision + outbox"]
+  B["Sếp xem đúng bản đã nộp"]
+  X["Xuất Excel từ snapshot"]
+  A --> M
+  M -->|"Có"| N
+  M -->|"Không"| D
+  N -->|"Vẫn nộp được phần khác"| D
+  D -->|"Nộp"| V
+  V -->|"Không hợp lệ"| E
+  V -->|"Hợp lệ"| S
+  S --> B
+  B --> X

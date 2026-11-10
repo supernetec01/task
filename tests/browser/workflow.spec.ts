@@ -5,7 +5,8 @@ async function login(page: Page, user: string) {
   await page.getByLabel('Tên đăng nhập', { exact: true }).fill(user + '@test.local');
   await page.getByLabel('Mật khẩu', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Tổng quan công việc' })).toBeVisible();
+  await expect(page.locator('.sidebar')).toBeAttached();
+  await nav(page, 'Công việc cũ');
 }
 async function nav(page: Page, name: string) {
   if (await page.getByRole('button', { name: 'Mở menu' }).isVisible())
@@ -42,7 +43,7 @@ test('Production UI: manager assigns → employee accepts/submits → manager re
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
   await logout(page);
   await login(page, 'employee');
-  await nav(page, 'Việc của tôi');
+  await nav(page, 'Công việc cũ');
   await page.getByLabel('Tìm task').fill(title);
   await page.getByRole('button', { name: title, exact: true }).click();
   await dialog.getByRole('button', { name: 'Nhận việc', exact: true }).click();
@@ -59,7 +60,7 @@ test('Production UI: manager assigns → employee accepts/submits → manager re
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
   await logout(page);
   await login(page, 'manager');
-  await nav(page, 'Công việc nhóm');
+  await nav(page, 'Công việc cũ');
   await page.getByLabel('Tìm task').fill(title);
   await page.getByRole('button', { name: title, exact: true }).click();
   await dialog.getByRole('tab', { name: 'Cập nhật & kết quả', exact: true }).click();
@@ -91,6 +92,17 @@ test('Production UI: manager assigns → employee accepts/submits → manager re
   await login(page, 'boss');
   await nav(page, 'Báo cáo');
   await page.getByRole('button', { name: 'Báo cáo đã nộp', exact: true }).click();
+  await page
+    .getByLabel('Tuần bắt đầu (thứ Hai)')
+    .fill(
+      new Date(
+        Date.now() +
+          7 * 3600e3 -
+          ((new Date(Date.now() + 7 * 3600e3).getUTCDay() + 6) % 7) * 86400e3,
+      )
+        .toISOString()
+        .slice(0, 10),
+    );
   await page.getByLabel('Phiên bản của employee').selectOption({ index: 1 });
   await expect(page.getByRole('button', { name: 'Xuất Excel', exact: true })).toBeVisible();
   const dl = page.waitForEvent('download');
@@ -166,7 +178,7 @@ test('Support invitation can be accepted and contribution saved on desktop/mobil
   page,
 }) => {
   await login(page, 'support');
-  await nav(page, 'Việc của tôi');
+  await nav(page, 'Công việc cũ');
   await page.getByLabel('Tìm task').fill('File persistence task');
   await page.getByRole('button', { name: 'File persistence task', exact: true }).click();
   const dialog = page.getByRole('dialog');

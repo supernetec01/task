@@ -1,0 +1,18 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.45,ranksep=0.5];
+node [shape=box,style="rounded,filled",fillcolor="#edf3e8",color="#b9cdb5",fontname="DejaVu Sans",fontsize=12,margin="0.15,0.12"];
+edge [color="#57745d",fontname="DejaVu Sans",fontsize=10];
+A [label="Đọc rule và ngày VN",shape=box];
+B [label="Chọn mốc còn hiệu lực / chưa xử lý",shape=box];
+C [label="Dedupe / catchup theo đối tượng và rule",shape=diamond];
+D [label="Bỏ qua mốc đã gửi / đã thay thế",shape=box];
+E [label="Xác định người đang có ROLE HR",shape=box];
+F [label="Outbox → thông báo trong app",shape=box];
+G [label="HR mở đúng hồ sơ và ghi xử lý",shape=box];
+A -> B;
+B -> C;
+C -> D [label="Đã xử lý"];
+C -> E [label="Cần gửi"];
+E -> F;
+F -> G;
+}

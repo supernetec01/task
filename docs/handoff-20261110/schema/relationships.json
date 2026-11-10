@@ -1,0 +1,622 @@
+[
+  {
+    "from_table": "business_resources",
+    "from_columns": [
+      "company_id"
+    ],
+    "to_table": "companies",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "business_resources",
+    "from_columns": [
+      "platform_id"
+    ],
+    "to_table": "platforms",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "resource_grants",
+    "from_columns": [
+      "resource_id"
+    ],
+    "to_table": "business_resources",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "resource_grants",
+    "from_columns": [
+      "user_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "import_errors",
+    "from_columns": [
+      "batch_id"
+    ],
+    "to_table": "metric_batches",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "import_confirmations",
+    "from_columns": [
+      "batch_id"
+    ],
+    "to_table": "metric_batches",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_partitions",
+    "from_columns": [
+      "company_id"
+    ],
+    "to_table": "companies",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_partitions",
+    "from_columns": [
+      "resource_id",
+      "company_id"
+    ],
+    "to_table": "business_resources",
+    "to_columns": [
+      "id",
+      "company_id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_revisions",
+    "from_columns": [
+      "partition_id"
+    ],
+    "to_table": "source_partitions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_revisions",
+    "from_columns": [
+      "batch_id"
+    ],
+    "to_table": "metric_batches",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_revisions",
+    "from_columns": [
+      "confirmation_id"
+    ],
+    "to_table": "import_confirmations",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "sales_daily_facts",
+    "from_columns": [
+      "source_revision_id"
+    ],
+    "to_table": "source_revisions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "koc_period_facts",
+    "from_columns": [
+      "source_revision_id"
+    ],
+    "to_table": "source_revisions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "return_order_facts",
+    "from_columns": [
+      "source_revision_id"
+    ],
+    "to_table": "source_revisions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "return_sku_facts",
+    "from_columns": [
+      "order_fact_id"
+    ],
+    "to_table": "return_order_facts",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_items",
+    "from_columns": [
+      "id"
+    ],
+    "to_table": "records",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_items",
+    "from_columns": [
+      "owner_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_items",
+    "from_columns": [
+      "writer_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_items",
+    "from_columns": [
+      "camera_operator_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_items",
+    "from_columns": [
+      "editor_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_participants",
+    "from_columns": [
+      "content_id"
+    ],
+    "to_table": "content_items",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_participants",
+    "from_columns": [
+      "user_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_stage_events",
+    "from_columns": [
+      "content_id"
+    ],
+    "to_table": "content_items",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "publications",
+    "from_columns": [
+      "id"
+    ],
+    "to_table": "records",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "publications",
+    "from_columns": [
+      "content_id"
+    ],
+    "to_table": "content_items",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "publications",
+    "from_columns": [
+      "channel_id"
+    ],
+    "to_table": "business_resources",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "publications",
+    "from_columns": [
+      "publisher_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "video_snapshots",
+    "from_columns": [
+      "publication_id"
+    ],
+    "to_table": "publications",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "video_snapshots",
+    "from_columns": [
+      "source_revision_id"
+    ],
+    "to_table": "source_revisions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "video_snapshots",
+    "from_columns": [
+      "date_confirmation_id"
+    ],
+    "to_table": "import_confirmations",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "video_window_facts",
+    "from_columns": [
+      "publication_id"
+    ],
+    "to_table": "publications",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "video_window_facts",
+    "from_columns": [
+      "source_revision_id"
+    ],
+    "to_table": "source_revisions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "candidate_profiles",
+    "from_columns": [
+      "id"
+    ],
+    "to_table": "records",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "job_applications",
+    "from_columns": [
+      "id"
+    ],
+    "to_table": "records",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "job_applications",
+    "from_columns": [
+      "candidate_id"
+    ],
+    "to_table": "candidate_profiles",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "job_applications",
+    "from_columns": [
+      "recruiter_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "interview_sessions",
+    "from_columns": [
+      "id"
+    ],
+    "to_table": "records",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "interview_sessions",
+    "from_columns": [
+      "application_id"
+    ],
+    "to_table": "job_applications",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "interview_users",
+    "from_columns": [
+      "interview_id"
+    ],
+    "to_table": "interview_sessions",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "interview_users",
+    "from_columns": [
+      "user_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "candidate_employee_links",
+    "from_columns": [
+      "application_id",
+      "candidate_id"
+    ],
+    "to_table": "job_applications",
+    "to_columns": [
+      "id",
+      "candidate_id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "candidate_employee_links",
+    "from_columns": [
+      "employee_id"
+    ],
+    "to_table": "employee_profiles",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_contracts",
+    "from_columns": [
+      "employee_id"
+    ],
+    "to_table": "employee_profiles",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_contract_revisions",
+    "from_columns": [
+      "contract_id"
+    ],
+    "to_table": "employee_contracts",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_salary_terms",
+    "from_columns": [
+      "employee_id"
+    ],
+    "to_table": "employee_profiles",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "companies",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "business_resources",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "resource_grants",
+    "from_columns": [
+      "granted_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "import_confirmations",
+    "from_columns": [
+      "actor_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "source_revisions",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_stage_events",
+    "from_columns": [
+      "actor_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "content_stage_events",
+    "from_columns": [
+      "credited_user_id"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "candidate_employee_links",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_contracts",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_contract_revisions",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  },
+  {
+    "from_table": "employee_salary_terms",
+    "from_columns": [
+      "created_by"
+    ],
+    "to_table": "users",
+    "to_columns": [
+      "id"
+    ],
+    "on_delete": "RESTRICT"
+  }
+]

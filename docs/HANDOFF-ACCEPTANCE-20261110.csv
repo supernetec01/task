@@ -1,0 +1,74 @@
+﻿id,area,requirement,status,evidence,limitations
+AUTH01,Quyền,"D01,D03",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+AUTH02,Quyền,D04,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+AUTH03,Quyền,D01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+AUTH04,Quyền,D03,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+AUTH05,Quyền,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+AUTH06,Quyền,D02,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK01,Task,E02,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK02,Task,D05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK03,Task,D05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK04,Task,E04,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK05,Task,E04,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK06,Task,E03,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK07,Task,D05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+TASK08,Task,E05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts,Automated test scenario; production data and company LAN are not covered.
+SORT01,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT02,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT03,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT04,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT05,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT06,Lọc/sort,E01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+SORT07,Lọc/sort,E12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP01,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP02,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP03,Import,E09,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP04,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP05,Import,E13,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP06,Import,E13,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP07,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP08,Import,D13,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP09,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP10,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP11,Import,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+IMP12,Import,G04,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET01,Sales,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET02,Sales,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET03,Sales,E08,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET04,KOC,"E10,G02",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET05,KOC,D12,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET06,KOC,G05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET07,Returns,E08,BLOCKED,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,"Source has 113 SKU rows / 112 orders, but order 586925627499971625 has refunds 143999 and 72000 in rows 108/109. Batch correctly blocked by ORDER_LEVEL_AMOUNT_CONFLICT; corrected source required."
+MET08,Returns,E08,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+MET09,Returns,G05,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+CONT01,Content,D06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+CONT02,Content,D06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+CONT03,Content,D06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+CONT04,Content,D06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+CONT05,Content,D06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+VID01,Video,"G01,G03",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+VID02,Video,E06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+VID03,Video,E06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+VID04,Video,E06,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR01,HR,D07,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts,Automated test scenario; production data and company LAN are not covered.
+HR02,HR,D07,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts,Automated test scenario; production data and company LAN are not covered.
+HR03,HR,D04,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR04,Ứng viên,D07,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR05,Lương,D07,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR06,Lương,D08,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts,Automated test scenario; production data and company LAN are not covered.
+HR07,Hợp đồng,D07,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR08,Nghỉ việc,E11,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR09,Sinh nhật,D11,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+HR10,Nhắc việc,"D10,D11",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT01,Báo cáo,D09,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT02,Báo cáo,D13,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT03,Báo cáo,D01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT04,Báo cáo,"G01,G02",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT05,Báo cáo,"D03,D09",PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+RPT06,Báo cáo,D13,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt,Automated test scenario; production data and company LAN are not covered.
+ACC01,Tài khoản,D02,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts; tests/browser/upgrade.spec.ts; tests/browser/approved.spec.ts,Automated test scenario; production data and company LAN are not covered.
+ACC02,Tài khoản,D02,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/core.test.ts; tests/browser/upgrade.spec.ts; tests/browser/approved.spec.ts,Automated test scenario; production data and company LAN are not covered.
+MIG01,Migration,D13,PASS,scripts/handoff-preview.mjs; docs/evidence-20261110/migration-fingerprints.txt,"Original row fingerprints preserved. Six approved specialist bundle grants added; legacy roles remain queued, not promoted."
+MIG02,Migration,D01,PASS,scripts/handoff-preview.mjs; docs/evidence-20261110/migration-fingerprints.txt,"Original row fingerprints preserved. Six approved specialist bundle grants added; legacy roles remain queued, not promoted."
+UI01,UI,D01,PASS,tests/handoff.test.ts; docs/evidence-20261110/server-tests.txt; tests/browser/handoff.spec.ts; docs/evidence-20261110/browser-tests.txt,Automated test scenario; production data and company LAN are not covered.
+OPS01,Vận hành,D13,BLOCKED,docs/evidence-20261110/restore-migration.txt; docs/RELEASE-5ROLE-20261110.md,"Cloud backup/restore, vault decryption, eight asset checksums and authenticated health/task requests passed. Windows/LAN: PENDING_SITE_VERIFICATION."

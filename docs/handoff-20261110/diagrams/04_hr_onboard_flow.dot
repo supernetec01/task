@@ -1,0 +1,22 @@
+digraph G {
+graph [rankdir=TB,bgcolor="white",pad=0.3,nodesep=0.45,ranksep=0.5];
+node [shape=box,style="rounded,filled",fillcolor="#edf3e8",color="#b9cdb5",fontname="DejaVu Sans",fontsize=12,margin="0.15,0.12"];
+edge [color="#57745d",fontname="DejaVu Sans",fontsize=10];
+C [label="Ứng viên + CV private",shape=box];
+A [label="Hồ sơ ứng tuyển",shape=box];
+I [label="Lịch phỏng vấn + đánh giá",shape=box];
+H [label="Đồng ý nhận việc?",shape=diamond];
+R [label="Giữ hồ sơ / kết quả không phù hợp",shape=box];
+P [label="Xác nhận mã và ngày nhận việc",shape=box];
+T [label="Transaction tạo profile + link ứng tuyển",shape=box];
+U [label="HR cấp user + ROLE chuyên môn",shape=box];
+K [label="Hợp đồng + mốc lương + nhắc việc",shape=box];
+C -> A [label="1 người, nhiều ứng tuyển"];
+A -> I;
+I -> H;
+H -> R [label="Không"];
+H -> P [label="Có"];
+P -> T [label="Kiểm trùng"];
+T -> U;
+U -> K;
+}
