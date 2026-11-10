@@ -112,7 +112,7 @@ test('Upgrade UI · accounts/viewers/password history, employee drawer/files/exp
   await modal.getByLabel('Họ tên', { exact: true }).fill('Nhân sự E2E ' + suffix);
   await modal.getByLabel('Ngày vào làm', { exact: true }).fill('2026-11-01');
   await modal.getByLabel('Content Marketing', { exact: true }).check();
-  await modal.getByLabel('Thiết kế', { exact: true }).check();
+  await modal.getByLabel('Vận hành sàn', { exact: true }).check();
   await modal.getByLabel('Bộ phận', { exact: true }).selectOption({ index: 1 });
   await modal.getByRole('button', { name: 'Lưu hồ sơ nhân viên', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'Hồ sơ nhân viên', exact: true });
@@ -174,7 +174,7 @@ test('Upgrade UI · accounts/viewers/password history, employee drawer/files/exp
     .getByLabel('Mật khẩu khởi tạo (ít nhất 11 ký tự)', { exact: true })
     .fill('UI-User-Test-2026!');
   await modal.getByLabel('Content Marketing', { exact: true }).check();
-  await modal.getByLabel('Thiết kế', { exact: true }).check();
+  await modal.getByLabel('Vận hành sàn', { exact: true }).check();
   await modal
     .getByLabel('Liên kết nhân viên đã có (không bắt buộc)')
     .selectOption({ label: employeeCode + ' · Nhân sự E2E ' + suffix });

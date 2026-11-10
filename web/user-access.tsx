@@ -65,11 +65,14 @@ export function UserAccessWizard({
 }) {
   const { data, error } = useLoad('/user-access-options');
   const [roles, setRoles] = useState<string[]>(
-      employee?.positions?.filter((p: any) => !p.effective_to).map((p: any) => p.position_code) ||
-        [],
+      employee?.positions
+        ?.filter(
+          (p: any) => !p.effective_to && ['CONTENT', 'MARKETPLACE', 'HR'].includes(p.position_code),
+        )
+        .map((p: any) => p.position_code) || [],
     ),
-    [access, setAccess] = useState('EMPLOYEE'),
-    [scope, setScope] = useState('SELF'),
+    [access, setAccess] = useState(''),
+    [scope, setScope] = useState('ALL'),
     [team, setTeam] = useState(employee?.team_id || ''),
     [manager, setManager] = useState(''),
     [same, setSame] = useState(true),
@@ -158,12 +161,14 @@ export function UserAccessWizard({
               reviewer_id: (same ? v.manager_id : v.reviewer_id) || null,
               employee_id: v.employee_id || null,
               job_grants: roles.map((role) => ({ role, ...date })),
-              access_grant: {
-                role: access,
-                scope,
-                team_id: scope === 'TEAM' ? v.team_id : null,
-                ...date,
-              },
+              access_grant: access
+                ? {
+                    role: access,
+                    scope,
+                    team_id: scope === 'TEAM' ? v.team_id : null,
+                    ...date,
+                  }
+                : undefined,
             },
             'POST',
             key,
@@ -182,16 +187,11 @@ export function UserAccessWizard({
               value={access}
               onChange={(e) => {
                 setAccess(e.target.value);
-                setScope(
-                  ['ADMIN', 'EXECUTIVE'].includes(e.target.value)
-                    ? 'ALL'
-                    : e.target.value === 'EMPLOYEE'
-                      ? 'SELF'
-                      : 'TEAM',
-                );
+                setScope('ALL');
               }}
             >
-              {['EMPLOYEE', 'MANAGER', 'BOSS', 'ADMIN', 'EXECUTIVE'].map((r) => (
+              <option value="">Theo chuyên môn</option>
+              {['BOSS', 'ADMIN'].map((r) => (
                 <option key={r} value={r}>
                   {roleLabel[r]}
                 </option>
@@ -205,12 +205,7 @@ export function UserAccessWizard({
               value={scope}
               onChange={(e) => setScope(e.target.value)}
             >
-              {(['ADMIN', 'EXECUTIVE'].includes(access)
-                ? ['ALL']
-                : access === 'EMPLOYEE'
-                  ? ['SELF']
-                  : ['TEAM', 'ALL']
-              ).map((r) => (
+              {['ALL'].map((r) => (
                 <option key={r} value={r}>
                   {(scopeNames as any)[r]}
                 </option>

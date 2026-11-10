@@ -135,7 +135,7 @@ export function Team({ me }: { me: any }) {
                           Date.parse(g.valid_from) <= Date.now() &&
                           (!g.valid_to || Date.parse(g.valid_to) > Date.now()) &&
                           ((g.role === 'ADMIN' && g.scope === 'ALL') ||
-                            (['MANAGER', 'BOSS'].includes(g.role) &&
+                            (['BOSS'].includes(g.role) &&
                               (g.scope === 'ALL' ||
                                 (g.scope === 'TEAM' && g.team_id === editingTeam)))),
                       ),
@@ -158,7 +158,7 @@ export function Team({ me }: { me: any }) {
                           Date.parse(g.valid_from) <= Date.now() &&
                           (!g.valid_to || Date.parse(g.valid_to) > Date.now()) &&
                           ((g.role === 'ADMIN' && g.scope === 'ALL') ||
-                            (['MANAGER', 'BOSS'].includes(g.role) &&
+                            (['BOSS'].includes(g.role) &&
                               (g.scope === 'ALL' ||
                                 (g.scope === 'TEAM' && g.team_id === editingTeam)))),
                       ),
@@ -231,8 +231,8 @@ export function Team({ me }: { me: any }) {
   );
 }
 function GrantForm({ userId, teamOptions, access, onDone }: any) {
-  const [role, setRole] = useState('EMPLOYEE'),
-    [scope, setScope] = useState('SELF');
+  const [role, setRole] = useState('BOSS'),
+    [scope, setScope] = useState('ALL');
   return (
     <Form
       fields={[
@@ -281,13 +281,7 @@ function GrantForm({ userId, teamOptions, access, onDone }: any) {
           value={role}
           onChange={(e) => {
             setRole(e.target.value);
-            setScope(
-              ['ADMIN', 'EXECUTIVE'].includes(e.target.value)
-                ? 'ALL'
-                : e.target.value === 'EMPLOYEE'
-                  ? 'SELF'
-                  : 'TEAM',
-            );
+            setScope('ALL');
           }}
         >
           {access.map((r: string) => (
@@ -300,14 +294,7 @@ function GrantForm({ userId, teamOptions, access, onDone }: any) {
       <label>
         Phạm vi
         <select value={scope} onChange={(e) => setScope(e.target.value)}>
-          {(['ADMIN', 'EXECUTIVE'].includes(role)
-            ? ['ALL']
-            : role === 'EMPLOYEE'
-              ? ['SELF']
-              : role === 'HR_SENSITIVE'
-                ? ['SELF', 'TEAM', 'ALL']
-                : ['TEAM', 'ALL']
-          ).map((r) => (
+          {['ALL'].map((r) => (
             <option key={r} value={r}>
               {({ SELF: 'Cá nhân', TEAM: 'Bộ phận', ALL: 'Toàn công ty' } as any)[r]}
             </option>
@@ -542,19 +529,7 @@ export function Settings() {
                   label: 'Chuyên môn',
                   type: 'select',
                   required: true,
-                  options: options(
-                    [
-                      'CONTENT',
-                      'DESIGNER',
-                      'MARKETPLACE',
-                      'ADS',
-                      'HR',
-                      'ACCOUNTANT',
-                      'WAREHOUSE',
-                      'INTERN',
-                    ],
-                    roleLabel,
-                  ),
+                  options: options(['CONTENT', 'MARKETPLACE', 'HR'], roleLabel),
                 },
                 { key: 'title', label: 'Tên công việc', required: true },
                 {

@@ -603,11 +603,7 @@ export function moduleRoutes(api: API) {
   });
   api('POST', '/requests/:id/fulfillment', async (c, a, b, q, p) => {
     const r = await one(c, 'SELECT * FROM requests WHERE id=$1 FOR UPDATE', [p.id]);
-    need(
-      r &&
-        (isAdmin(a) || hasJob(a, 'ACCOUNTANT')) &&
-        (isAdmin(a) || r.policy_snapshot?.approvers.includes(a.id)),
-    );
+    need(r && isAdmin(a));
     version(r, b.expected_version);
     need(r.state === 'APPROVED', 'Chỉ xử lý sau phê duyệt đầy đủ', 409, 'STATE');
     const v = z

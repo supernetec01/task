@@ -51,47 +51,18 @@ export async function validateReporting(
 export async function addGrant(c: DB, a: Actor, uid: string, input: any) {
   const v = grantSchema.parse(input);
   need(
-    v.role !== 'EXECUTIVE',
-    'Quyền Ban lãnh đạo cũ chỉ giữ lịch sử; không cấp mới',
+    (v.kind === 'JOB' ? jobs : access).includes(v.role),
+    'Chỉ hỗ trợ ADMIN, BOSS, MARKETPLACE, HR và CONTENT',
     422,
     'RETIRED_ROLE',
   );
   need(
-    (v.kind === 'JOB' ? jobs : access).includes(v.role),
-    'Vai trò không hợp lệ',
+    v.scope === (v.kind === 'JOB' ? 'SELF' : 'ALL'),
+    'Chuyên môn có phạm vi cá nhân; ADMIN/BOSS có phạm vi toàn công ty',
     422,
     'VALIDATION',
   );
-  need(
-    v.kind !== 'JOB' || v.scope === 'SELF',
-    'Chuyên môn chỉ có phạm vi cá nhân',
-    422,
-    'VALIDATION',
-  );
-  need(
-    !['ADMIN', 'EXECUTIVE'].includes(v.role) || v.scope === 'ALL',
-    'Admin phải có phạm vi toàn công ty',
-    422,
-    'VALIDATION',
-  );
-  need(
-    v.role !== 'EMPLOYEE' || v.scope === 'SELF',
-    'Nhân viên có phạm vi cá nhân',
-    422,
-    'VALIDATION',
-  );
-  need(
-    !['MANAGER', 'BOSS'].includes(v.role) || ['TEAM', 'ALL'].includes(v.scope),
-    'Quản lý/Sếp cần phạm vi nhóm hoặc toàn công ty',
-    422,
-    'VALIDATION',
-  );
-  need(
-    v.scope === 'TEAM' ? !!v.team_id : !v.team_id,
-    'Bộ phận áp dụng phải phù hợp phạm vi',
-    422,
-    'VALIDATION',
-  );
+  need(!v.team_id, 'Không cấp ROLE theo phạm vi nhóm', 422, 'VALIDATION');
   const start = v.valid_from || new Date().toISOString(),
     end = v.valid_to || null;
   need(
@@ -140,7 +111,7 @@ export async function createUserWithAccess(c: DB, a: Actor, b: any) {
       reviewer_id: z.uuid().nullable().default(null),
       employee_id: z.uuid().nullable().default(null),
       job_grants: z.array(jobGrant).min(1).max(20),
-      access_grant: accessGrant,
+      access_grant: accessGrant.optional(),
     })
     .parse(b);
   need(
@@ -176,7 +147,7 @@ export async function createUserWithAccess(c: DB, a: Actor, b: any) {
     ],
   );
   for (const g of v.job_grants) await addGrant(c, a, u.id, { ...g, kind: 'JOB', scope: 'SELF' });
-  await addGrant(c, a, u.id, { ...v.access_grant, kind: 'ACCESS' });
+  if (v.access_grant) await addGrant(c, a, u.id, { ...v.access_grant, kind: 'ACCESS' });
   if (employee) {
     await c.query('UPDATE employee_profiles SET user_id=$2,version=version+1 WHERE id=$1', [
       employee.id,
@@ -202,7 +173,7 @@ export function userAccessRoutes(api: API) {
     );
     for (const p of people)
       p.scopes = (await actor(c, p.id)).grants
-        .filter((g) => g.kind === 'ACCESS' && ['ADMIN', 'BOSS', 'MANAGER'].includes(g.role))
+        .filter((g) => g.kind === 'ACCESS' && ['ADMIN', 'BOSS'].includes(g.role))
         .map((g) => ({ role: g.role, scope: g.scope, team_id: g.team_id }));
     return {
       people,

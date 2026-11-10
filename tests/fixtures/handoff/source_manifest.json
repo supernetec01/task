@@ -2,7 +2,7 @@
   "original_files": [
     {
       "adapter": "TIKTOK_RETURNS",
-      "file": "fixtures/originals/TikTok退貨取消報表_Bao_cao_hoan_huy_TikTok_20261102-20261108.xlsx",
+      "file": "originals/TikTok退貨取消報表_Bao_cao_hoan_huy_TikTok_20261102-20261108.xlsx",
       "sha256": "dfa04d153d741150143943f86f126e63f571f96781cda96922b9e85a717306ea",
       "bytes": 52805,
       "controls": {
@@ -15,7 +15,7 @@
     },
     {
       "adapter": "KOC_SALES",
-      "file": "fixtures/originals/TikTok達人銷售報表_Bao_cao_doanh_so_KOC_TikTok_20261102-20261108.xlsx",
+      "file": "originals/TikTok達人銷售報表_Bao_cao_doanh_so_KOC_TikTok_20261102-20261108.xlsx",
       "sha256": "30a29fc3cb0a16685e0d1f35702c9f9c13f41ff90601b499a7405742df21d1d6",
       "bytes": 111645,
       "controls": {
@@ -33,7 +33,7 @@
     },
     {
       "adapter": "SHOPEE_SALES",
-      "file": "fixtures/originals/Shopee銷售報表_Bao_cao_ban_hang_Shopee_20261102-20261108.xlsx",
+      "file": "originals/Shopee銷售報表_Bao_cao_ban_hang_Shopee_20261102-20261108.xlsx",
       "sha256": "96fc8fc22b2bd4a4361868317d9b27f305c0b6086a3e3f7768a3c5c507f752d8",
       "bytes": 4371,
       "controls": {
@@ -52,7 +52,7 @@
     },
     {
       "adapter": "TIKTOK_SALES",
-      "file": "fixtures/originals/TikTok銷售報表_Bao_cao_ban_hang_TikTok_20261102-20261108.xlsx",
+      "file": "originals/TikTok銷售報表_Bao_cao_ban_hang_TikTok_20261102-20261108.xlsx",
       "sha256": "6122d93c6b36b4bf552439539780db38a99cf3a4f8ac9ca3c261b89235b07545",
       "bytes": 4372,
       "controls": {
@@ -71,7 +71,7 @@
     },
     {
       "adapter": "VIDEO_PERFORMANCE",
-      "file": "fixtures/originals/TikTok影片成效報表_Bao_cao_hieu_qua_video_TikTok_20261102-20261108.xlsx",
+      "file": "originals/TikTok影片成效報表_Bao_cao_hieu_qua_video_TikTok_20261102-20261108.xlsx",
       "sha256": "66b485726e8bbecfbe91d39510c5ca292d8e16d797849600bf8e96a53c5e5aa4",
       "bytes": 23588,
       "controls": {

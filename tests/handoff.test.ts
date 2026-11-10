@@ -23,8 +23,8 @@ const ids: Record<string, string> = {},
   sessions: Record<string, { cookie: string; csrf: string }> = {};
 const password = randomBytes(24).toString('base64url');
 let app: Awaited<ReturnType<typeof buildApp>>;
-const sourceRoot = 'docs/handoff-20261110/';
-const sources = JSON.parse(readFileSync(sourceRoot + 'fixtures/source_manifest.json', 'utf8'))
+const sourceRoot = 'tests/fixtures/handoff/';
+const sources = JSON.parse(readFileSync(sourceRoot + 'source_manifest.json', 'utf8'))
   .original_files as any[];
 async function request(
   who: string,
@@ -351,9 +351,7 @@ test('SORT01..06 · anchored ordering, half-open dates, signed cursor, facets an
   await tx(async (c) => {
     const a = await actor(c, ids.content),
       anchor = '2026-11-10T07:00:00.000Z';
-    const fixture = JSON.parse(
-      readFileSync(sourceRoot + 'fixtures/synthetic/task_sort.json', 'utf8'),
-    );
+    const fixture = JSON.parse(readFileSync(sourceRoot + 'synthetic/task_sort.json', 'utf8'));
     assert(fixture);
     const defs = [
       ['A', '2026-11-09T10:00:00+07:00', 'URGENT'],
@@ -849,9 +847,9 @@ test('IMP03/05/06 · hostile archives, formulas, 1904 dates, long IDs and source
   const zip = await JSZip.loadAsync(bytes);
   zip.file('xl/vbaProject.bin', 'synthetic invalid macro');
   await assert.rejects(readSource(await zip.generateAsync({ type: 'nodebuffer' }), 'macros.xlsx'));
-  const adapter = JSON.parse(
-    readFileSync(sourceRoot + 'contracts/import_adapters.json', 'utf8'),
-  ).adapters.find((a: any) => a.code === 'TIKTOK_RETURNS');
+  const adapter = JSON.parse(readFileSync('config/import-adapters.json', 'utf8')).adapters.find(
+    (a: any) => a.code === 'TIKTOK_RETURNS',
+  );
   const header = adapter.columns.map((c: any) => c.header);
   const values = adapter.columns.map(
     (c: any) =>
@@ -1212,9 +1210,9 @@ test('IMP02/05/07/MET03/05/09 · wrong source, duplicate bytes, exact ratios and
     `/koc/summary?company_id=${ids.company}&resource_id=${ids.shop}&from=2026-11-02&to=2026-11-08`,
   );
   assert(Math.abs(Number(koc.top10[0].share) - 16201794 / 52399786) < 1e-12);
-  const defs = JSON.parse(
-    readFileSync(sourceRoot + 'contracts/import_adapters.json', 'utf8'),
-  ).adapters.find((a: any) => a.code === 'TIKTOK_RETURNS');
+  const defs = JSON.parse(readFileSync('config/import-adapters.json', 'utf8')).adapters.find(
+    (a: any) => a.code === 'TIKTOK_RETURNS',
+  );
   const header = defs.columns.map((c: any) => c.header);
   const row = defs.columns.map(
     (c: any) =>
@@ -1400,9 +1398,9 @@ test('HR03/10/MET05/RPT06 · injected provisioning rollback, catch-up once, zero
     await pool.query('DROP TRIGGER synthetic_fail_link ON employee_profiles');
     await pool.query('DROP FUNCTION synthetic_fail_link()');
   }
-  const adapter = JSON.parse(
-    readFileSync(sourceRoot + 'contracts/import_adapters.json', 'utf8'),
-  ).adapters.find((a: any) => a.code === 'KOC_SALES');
+  const adapter = JSON.parse(readFileSync('config/import-adapters.json', 'utf8')).adapters.find(
+    (a: any) => a.code === 'KOC_SALES',
+  );
   const wb = new ExcelJS.Workbook(),
     sheet = wb.addWorksheet('Synthetic zero source');
   sheet.addRow(adapter.columns.map((c: any) => c.header));

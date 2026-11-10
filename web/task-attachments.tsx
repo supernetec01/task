@@ -19,10 +19,7 @@ export function Transfer({ t, onDone }: { t: any; onDone: () => void }) {
           type: 'select',
           required: true,
           options: options(
-            Object.keys(roleLabel).filter(
-              (r) =>
-                !['ADMIN', 'MANAGER', 'BOSS', 'EMPLOYEE', 'COMMON', 'HR_SENSITIVE'].includes(r),
-            ),
+            Object.keys(roleLabel).filter((r) => ['CONTENT', 'MARKETPLACE', 'HR'].includes(r)),
             roleLabel,
           ),
         },

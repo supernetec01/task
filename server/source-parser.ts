@@ -5,9 +5,8 @@ import { readFileSync } from 'node:fs';
 import { safeWorkbook } from './metrics.js';
 import { need, hash, localDate } from './base.js';
 
-export const adapters = JSON.parse(
-  readFileSync('docs/handoff-20261110/contracts/import_adapters.json', 'utf8'),
-).adapters as any[];
+export const adapters = JSON.parse(readFileSync('config/import-adapters.json', 'utf8'))
+  .adapters as any[];
 export const normalize = (v: any) =>
   String(v ?? '')
     .normalize('NFC')

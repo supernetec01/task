@@ -16,16 +16,13 @@ import {
   localDate,
   jobs,
   setting,
-  isExecutive,
   decipher,
 } from './base.js';
 import { employeeRevision, basicSnapshot } from './employee-history.js';
 export const hrEdit = (a: Actor) => isAdmin(a) || hasJob(a, 'HR');
-export const payrollAllowed = (a: Actor) => hrEdit(a) || isExecutive(a);
+export const payrollAllowed = (a: Actor) => hrEdit(a);
 export async function hrAccess(c: DB, a: Actor, id: string, lock = false) {
-  need(hrEdit(a) || isExecutive(a));
-  if (lock)
-    need(hrEdit(a), 'Ban lãnh đạo có quyền xem; chỉnh sửa hồ sơ cơ bản dành cho Admin và HR');
+  need(hrEdit(a));
   const e = await one(
     c,
     'SELECT * FROM employee_profiles WHERE id=$1' + (lock ? ' FOR UPDATE' : ''),
@@ -35,7 +32,7 @@ export async function hrAccess(c: DB, a: Actor, id: string, lock = false) {
   return e;
 }
 export async function sensitiveAllowed(c: DB, a: Actor, e: any) {
-  return isAdmin(a) || isExecutive(a);
+  return isAdmin(a);
 }
 const nullableDate = z.iso.date().nullable().default(null);
 const contact = z
@@ -136,7 +133,7 @@ async function details(c: DB, a: Actor, e: any) {
   };
 }
 async function employeeList(c: DB, a: Actor, q: any) {
-  need(hrEdit(a) || isExecutive(a));
+  need(hrEdit(a));
   const data = await rows(
     c,
     `SELECT e.*,t.name AS team_name FROM employee_profiles e LEFT JOIN teams t ON t.id=e.team_id WHERE e.employment_state<>'CANDIDATE' AND ($1::boolean=(e.archived_at IS NOT NULL OR e.employment_state='LEFT')) AND (e.name ILIKE $2 OR coalesce(e.employee_code,'') ILIKE $2) AND ($3='' OR e.team_id::text=$3) AND ($4='' OR e.employment_state=$4) AND ($5='' OR e.employment_type=$5) AND ($6='' OR EXISTS(SELECT 1 FROM employee_positions p WHERE p.employee_id=e.id AND p.position_code=$6 AND p.effective_to IS NULL)) ORDER BY e.name,e.id`,
@@ -282,7 +279,7 @@ export async function createEmployee(c: DB, a: Actor, b: any) {
 }
 export function employeeRoutes(api: API) {
   api('GET', '/employees/options', async (c, a) => {
-    need(hrEdit(a) || isExecutive(a));
+    need(hrEdit(a));
     const people = await rows(c, 'SELECT id,name,team_id FROM users WHERE active ORDER BY name');
     const managers = [];
     for (const p of people) {
@@ -293,7 +290,7 @@ export function employeeRoutes(api: API) {
           name: p.name,
           team_id: p.team_id,
           scopes: u.grants
-            .filter((g) => g.kind === 'ACCESS' && ['ADMIN', 'MANAGER', 'BOSS'].includes(g.role))
+            .filter((g) => g.kind === 'ACCESS' && ['ADMIN', 'BOSS'].includes(g.role))
             .map((g) => ({ scope: g.scope, team_id: g.team_id })),
         });
     }

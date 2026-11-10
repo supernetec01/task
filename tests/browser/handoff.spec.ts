@@ -147,7 +147,11 @@ test('HANDOFF ADMIN · source catalog persists from settings and only five roles
   const name = 'Browser company ' + Date.now();
   await companyForm.getByLabel('Mã pháp nhân', { exact: true }).fill('BROWSER_' + Date.now());
   await companyForm.getByLabel('Tên pháp nhân', { exact: true }).fill(name);
+  const saved = page.waitForResponse(
+    (r) => r.url().endsWith('/api/v1/companies') && r.request().method() === 'POST',
+  );
   await companyForm.getByRole('button', { name: 'Lưu', exact: true }).click();
+  expect((await saved).status()).toBe(200);
   const response = await page.request.get('/api/v1/companies');
   expect((await response.json()).items.some((c: any) => c.name === name)).toBe(true);
   await navigate(page, 'Đội ngũ & phân quyền');

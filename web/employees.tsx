@@ -555,8 +555,7 @@ function EmployeeDrawer({ id, me, onClose, onChanged }: any) {
                   ))}
                 </dl>
                 <p className="notice">
-                  Định danh, thuế, BHXH và ngân hàng: Admin / Ban lãnh đạo. Lương, thưởng: HR /
-                  Admin / Ban lãnh đạo.
+                  Định danh, thuế, BHXH và ngân hàng: Admin. Lương, thưởng: HR / Admin.
                 </p>
                 {e.capabilities.payroll && (
                   <SensitiveProfile
@@ -890,11 +889,7 @@ function SensitiveProfile({ e, onSaved, payroll = false }: any) {
     );
   return (
     <details onToggle={(event) => setOpen(event.currentTarget.open)}>
-      <summary>
-        {payroll
-          ? 'Lương / thưởng · HR, Admin và Ban lãnh đạo'
-          : 'Thông tin nhạy cảm · Admin và Ban lãnh đạo'}
-      </summary>
+      <summary>{payroll ? 'Lương / thưởng · HR và Admin' : 'Thông tin nhạy cảm · Admin'}</summary>
       <Loaded data={data} error={error}>
         {data && (
           <Form

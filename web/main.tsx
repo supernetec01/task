@@ -599,18 +599,7 @@ function Tasks({ mode, me, revision, onTask, filter, setFilter, onList }: any) {
               >
                 <option value="">Tất cả vai trò</option>
                 {Object.entries(roleLabel)
-                  .filter(([k]) =>
-                    [
-                      'CONTENT',
-                      'DESIGNER',
-                      'MARKETPLACE',
-                      'ADS',
-                      'HR',
-                      'ACCOUNTANT',
-                      'WAREHOUSE',
-                      'INTERN',
-                    ].includes(k),
-                  )
+                  .filter(([k]) => ['CONTENT', 'MARKETPLACE', 'HR'].includes(k))
                   .map(([k, v]) => (
                     <option key={k} value={k}>
                       {v}

@@ -75,21 +75,11 @@ export const statusLabel: Record<string, string> = {
 };
 export const roleLabel: Record<string, string> = {
   CONTENT: 'Content Marketing',
-  DESIGNER: 'Thiết kế',
   MARKETPLACE: 'Vận hành sàn',
-  ADS: 'Quảng cáo',
   HR: 'Nhân sự',
-  ACCOUNTANT: 'Kế toán',
-  WAREHOUSE: 'Kho',
-  INTERN: 'Thực tập sinh',
   ADMIN: 'Quản trị viên',
-  MANAGER: 'Quản lý',
   BOSS: 'Sếp',
-  EMPLOYEE: 'Nhân viên',
-  HR_SENSITIVE: 'Quyền cũ · không mở hồ sơ nhạy cảm',
-  EXECUTIVE: 'Ban lãnh đạo · hồ sơ nhạy cảm',
   COMMON: 'Bổ sung chung',
-  TESTER_OPTIONAL: 'Kiểm thử',
 };
 export function FieldControl({
   field: f,

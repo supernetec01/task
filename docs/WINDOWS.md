@@ -1,12 +1,12 @@
 # Triển khai Windows tại công ty
 
-Chưa thực thi các script Windows trong môi trường cloud Linux; cần nghiệm thu trên máy thật. Không dùng Python demo server của gói tham chiếu để vận hành.
+Chưa thực thi các script Windows trong môi trường cloud Linux; cần nghiệm thu trên máy thật.
 
 ## Cài đặt và quyền
 
 Làm theo README để cài Node 24, PostgreSQL 17, `.env`, production build, migration và bootstrap. Đặt thư mục code riêng với dữ liệu: ví dụ `C:\SuperNet\app`, `C:\ProgramData\SuperNet\files`, backup ổ khác/NAS. Đảm bảo người dùng chạy dịch vụ có quyền đọc code/config, ghi DATA_DIR/logs. Giới hạn ACL `.env` cho người vận hành và tài khoản dịch vụ; không để tệp này trong thư mục web public hoặc Git. Mật khẩu DB/Vault key không truyền qua tham số startup.
 
-PostgreSQL chỉ nghe loopback, `pg_hba.conf` chỉ cho tài khoản DB đã cấu hình dùng SCRAM. Tạo migration role riêng và runtime role ít quyền theo SCHEMA.md. CLI migrate đọc `MIGRATION_DATABASE_URL` nếu được đặt; API/worker dùng `DATABASE_URL`. Kiểm tra quyền runtime sau migration bằng người vận hành. Ví dụ cấp quyền (đổi tên role đúng cài đặt):
+PostgreSQL chỉ nghe loopback, `pg_hba.conf` chỉ cho tài khoản DB đã cấu hình dùng SCRAM. Tạo migration role riêng và runtime role ít quyền theo hướng dẫn quyền SQL bên dưới. CLI migrate đọc `MIGRATION_DATABASE_URL` nếu được đặt; API/worker dùng `DATABASE_URL`. Kiểm tra quyền runtime sau migration bằng người vận hành. Ví dụ cấp quyền (đổi tên role đúng cài đặt):
 
 ```sql
 GRANT CONNECT ON DATABASE supernet TO supernet_runtime;

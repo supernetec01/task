@@ -394,35 +394,34 @@ export function Requests({ me }: { me: any }) {
                     label="Ghi quyết định"
                   />
                 )}
-              {selected.state === 'APPROVED' &&
-                (me.admin || me.grants.some((g: any) => g.role === 'ACCOUNTANT')) && (
-                  <Form
-                    fields={[
-                      {
-                        key: 'external_reference',
-                        label: 'Mã xử lý ở hệ thống / hồ sơ bên ngoài',
-                        required: true,
-                      },
-                      {
-                        key: 'note',
-                        label: 'Nội dung đã xử lý và căn cứ',
-                        required: true,
-                        type: 'textarea',
-                      },
-                    ]}
-                    onSubmit={async (v, key) => {
-                      await api(
-                        '/requests/' + selected.id + '/fulfillment',
-                        { ...v, expected_version: selected.version },
-                        'POST',
-                        key,
-                      );
-                      setSelected(null);
-                      refresh();
-                    }}
-                    label="Ghi nhận xử lý thực tế"
-                  />
-                )}
+              {selected.state === 'APPROVED' && me.admin && (
+                <Form
+                  fields={[
+                    {
+                      key: 'external_reference',
+                      label: 'Mã xử lý ở hệ thống / hồ sơ bên ngoài',
+                      required: true,
+                    },
+                    {
+                      key: 'note',
+                      label: 'Nội dung đã xử lý và căn cứ',
+                      required: true,
+                      type: 'textarea',
+                    },
+                  ]}
+                  onSubmit={async (v, key) => {
+                    await api(
+                      '/requests/' + selected.id + '/fulfillment',
+                      { ...v, expected_version: selected.version },
+                      'POST',
+                      key,
+                    );
+                    setSelected(null);
+                    refresh();
+                  }}
+                  label="Ghi nhận xử lý thực tế"
+                />
+              )}
             </>
           )}
         </Modal>

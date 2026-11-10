@@ -113,18 +113,18 @@ before(async () => {
       'Quản lý kiểm thử',
       password,
       'CONTENT',
-      'MANAGER',
+      'BOSS',
       t.id,
       ids.boss,
     );
     for (const [key, job] of [
       ['admin', 'CONTENT'],
       ['employee', 'CONTENT'],
-      ['support', 'DESIGNER'],
-      ['decline', 'DESIGNER'],
+      ['support', 'MARKETPLACE'],
+      ['decline', 'MARKETPLACE'],
       ['hr', 'HR'],
       ['sales', 'MARKETPLACE'],
-      ['ads', 'ADS'],
+      ['ads', 'CONTENT'],
       ['outside', 'CONTENT'],
     ])
       ids[key] = await createUser(
@@ -133,7 +133,7 @@ before(async () => {
         key,
         password,
         job,
-        key === 'admin' ? 'ADMIN' : 'EMPLOYEE',
+        key === 'admin' ? 'ADMIN' : null,
         key === 'outside' ? other.id : t.id,
         ids.manager,
       );
@@ -220,8 +220,8 @@ test('AT-007,064 · short task create is atomic, one task, two independent pendi
     owner_id: ids.employee,
     due_at: new Date(Date.now() + 86400e3).toISOString(),
     supporters: [
-      { user_id: ids.support, role: 'DESIGNER' },
-      { user_id: ids.decline, role: 'DESIGNER' },
+      { user_id: ids.support, role: 'MARKETPLACE' },
+      { user_id: ids.decline, role: 'MARKETPLACE' },
     ],
   });
   assert.equal(task.status, 'ASSIGNED');
@@ -856,7 +856,7 @@ test('Files · actual upload/download, checksum, safe name, private pending ACL,
     owner_id: ids.employee,
     role: 'CONTENT',
     due_at: new Date(Date.now() + 86400e3).toISOString(),
-    supporters: [{ user_id: ids.support, role: 'DESIGNER' }],
+    supporters: [{ user_id: ids.support, role: 'MARKETPLACE' }],
   });
   const body = Buffer.from('private evidence file');
   const upload = await multipartRequest(
@@ -980,7 +980,7 @@ test('AT-028..030 · authoritative report fixture has 3 total, 3 started, 1 done
       'Fixture employee',
       password,
       'CONTENT',
-      'EMPLOYEE',
+      null,
       ids.team,
       ids.manager,
     );
@@ -1045,7 +1045,7 @@ test('AT-071,072 · support snapshot remains independent of later contribution r
     title: 'Support report task',
     role: 'CONTENT',
     due_at: new Date(Date.now() + 86400e3).toISOString(),
-    supporters: [{ user_id: ids.support, role: 'DESIGNER' }],
+    supporters: [{ user_id: ids.support, role: 'MARKETPLACE' }],
   });
   t = await ok('employee', 'GET', '/tasks/' + t.id);
   const invite = t.supporters[0];
@@ -1236,7 +1236,7 @@ test('Draft dispatch completes missing deadline; supporting documents can be upl
     owner_id: ids.employee,
     role: 'CONTENT',
     draft: true,
-    supporters: [{ user_id: ids.support, role: 'DESIGNER' }],
+    supporters: [{ user_id: ids.support, role: 'MARKETPLACE' }],
   });
   assert.equal((await request('support', 'GET', '/tasks/' + d.id)).status, 404);
   const t = await ok('manager', 'POST', '/tasks/' + d.id + '/dispatch', {
@@ -1300,7 +1300,6 @@ test('Username admin bootstrap accepts exactly 11 characters, hashes secret and 
     headers,
     payload: {
       job_grants: [{ role: 'CONTENT' }],
-      access_grant: { role: 'EMPLOYEE', scope: 'SELF' },
       username: 'username_only',
       name: 'No email needed',
       password: secret,
@@ -1335,7 +1334,11 @@ test('F01/F02 · catalog complete, strict configuration, versioned Admin edits p
   const list = await ok('admin', 'GET', '/admin/task-templates');
   const mappings = catalog.roles || catalog;
   const serialized = JSON.stringify(mappings);
-  assert(list.items.length >= 74);
+  const seeds = JSON.parse(
+    (await import('node:fs')).readFileSync('config/task_templates.json', 'utf8'),
+  ).templates;
+  assert.deepEqual(list.items.map((t: any) => t.code).sort(), seeds.map((t: any) => t.code).sort());
+  assert.deepEqual(Object.keys(mappings).sort(), ['CONTENT', 'HR', 'MARKETPLACE']);
   for (const t of list.items) {
     assert(t.definition.name);
     assert(t.definition.group);
@@ -1449,7 +1452,7 @@ test('F03/F04/F06 · staged file private, creation atomic, unified update and co
   assert.equal((await request('support', 'POST', '/tasks', common)).status, 422);
   let t = await ok('employee', 'POST', '/tasks', {
     ...common,
-    supporters: [{ user_id: ids.support, role: 'DESIGNER' }],
+    supporters: [{ user_id: ids.support, role: 'MARKETPLACE' }],
   });
   t = await ok('employee', 'GET', '/tasks/' + t.id);
   assert.equal(t.role, 'CONTENT');
@@ -1520,7 +1523,7 @@ test('F11 · submitted report remains immutable and discoverable after ownership
   assert(before.snapshot.principal.some((v: any) => v.id === t.id));
   await ok('manager', 'POST', '/tasks/' + t.id + '/transfer', {
     owner_id: ids.decline,
-    role: 'DESIGNER',
+    role: 'MARKETPLACE',
     reason: 'Chuyển để kiểm thử lịch sử',
     expected_version: t.version,
   });
@@ -1888,7 +1891,7 @@ test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejec
     employee_code: '00017',
     name: 'Nhân viên liên kết',
     joined_on: '2026-11-01',
-    positions: ['CONTENT', 'DESIGNER'],
+    positions: ['CONTENT', 'MARKETPLACE'],
     phase: 'PROBATION',
     employment_type: 'PART_TIME',
     team_id: ids.team,
@@ -1902,8 +1905,7 @@ test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejec
     team_id: ids.team,
     manager_id: ids.manager,
     reviewer_id: ids.manager,
-    job_grants: [{ role: 'CONTENT' }, { role: 'DESIGNER' }],
-    access_grant: { role: 'EMPLOYEE', scope: 'SELF' },
+    job_grants: [{ role: 'CONTENT' }, { role: 'MARKETPLACE' }],
   };
   assert.equal(
     (
@@ -1989,14 +1991,14 @@ test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejec
     expected_version: 2,
   });
   assert.equal(changed.positions.filter((p: any) => !p.effective_to).length, 2);
-  assert(changed.positions.some((p: any) => p.position_code === 'DESIGNER' && p.effective_to));
+  assert(changed.positions.some((p: any) => p.position_code === 'MARKETPLACE' && p.effective_to));
   const grants = (
     await pool.query(
       "SELECT role FROM grants WHERE user_id=$1 AND kind='JOB' AND revoked_at IS NULL",
       [u.id],
     )
   ).rows.map((r) => r.role);
-  assert(grants.includes('DESIGNER'));
+  assert(grants.includes('MARKETPLACE'));
   const login = await app.inject({
     method: 'POST',
     url: '/api/v1/auth/login',
@@ -2023,16 +2025,16 @@ test('USR01..04/HR02..03 · atomic multi-role creation links one employee, rejec
     (await request('roleUpgrade', 'GET', '/platform-accounts/' + account.id)).status,
     200,
   );
-  assert((await ok('roleUpgrade', 'GET', '/me')).grants.some((g: any) => g.role === 'DESIGNER'));
+  assert((await ok('roleUpgrade', 'GET', '/me')).grants.some((g: any) => g.role === 'MARKETPLACE'));
   assert.equal(
     (
       await ok('roleUpgrade', 'POST', '/tasks', {
-        title: 'Vai trò thiết kế vẫn hoạt động',
-        role: 'DESIGNER',
+        title: 'Vai trò vận hành sàn vẫn hoạt động',
+        role: 'MARKETPLACE',
         due_at: new Date(Date.now() + 86400e3).toISOString(),
       })
     ).role,
-    'DESIGNER',
+    'MARKETPLACE',
   );
 });
 test('HR01/04/06/07 · scoped personnel/files/export, no recruitment UI types, safe workbook and legacy preserved', async () => {
@@ -2387,7 +2389,7 @@ test('Approved HR · company-wide list/detail/export and immutable before/after 
       'Ban lãnh đạo QC',
       password,
       'CONTENT',
-      'EMPLOYEE',
+      null,
       ids.team,
       ids.manager,
     ),
@@ -2440,7 +2442,7 @@ test('Approved HR · company-wide list/detail/export and immutable before/after 
   assert.equal((await ok('hr', 'GET', '/employees/' + e.id)).name, 'Đã sửa bởi HR');
   assert.equal((await request('hr', 'GET', '/employees/export?search=REVIEW-HR-001')).status, 200);
 });
-test('Approved privacy · HR payroll only; management is not executive; explicit executive grant required', async () => {
+test('Privacy · HR payroll only; retired executive grants cannot restore access', async () => {
   let e = await ok('admin', 'GET', '/employees/' + ids.reviewEmployee);
   await ok('admin', 'PUT', '/employees/' + e.id + '/sensitive', {
     expected_version: e.version,
@@ -2480,19 +2482,18 @@ test('Approved privacy · HR payroll only; management is not executive; explicit
     ).status,
     422,
   );
-  // Synthetic historical grant: HANDOFF forbids issuing new EXECUTIVE grants,
-  // while this regression must still exercise retained legacy access.
+  // Retired grants are retained as history and never restore access.
   await pool.query(
-    "INSERT INTO grants(user_id,kind,role,scope,reason) VALUES($1,'ACCESS','EXECUTIVE','ALL','SYNTHETIC legacy grant predating HANDOFF')",
+    "INSERT INTO grants(user_id,kind,role,scope,reason,revoked_at) VALUES($1,'ACCESS','EXECUTIVE','ALL','SYNTHETIC revoked historical grant',now())",
     [ids.reviewLeader],
   );
   assert.equal(
-    (await ok('reviewLeader', 'GET', '/employees/' + e.id + '/sensitive')).data.tax_id,
-    'TAX-PRIVATE',
+    (await request('reviewLeader', 'GET', '/employees/' + e.id + '/sensitive')).status,
+    403,
   );
   assert.equal(
-    (await ok('reviewLeader', 'GET', '/employees/' + e.id + '/payroll')).data.salary,
-    'SALARY-REVIEW-PRIVATE',
+    (await request('reviewLeader', 'GET', '/employees/' + e.id + '/payroll')).status,
+    403,
   );
   const list = JSON.stringify(await ok('hr', 'GET', '/employees?search=REVIEW-HR-001'));
   for (const secret of ['SALARY-REVIEW-PRIVATE', 'BANK-PRIVATE', 'TAX-PRIVATE'])

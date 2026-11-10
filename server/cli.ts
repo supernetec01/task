@@ -1,4 +1,4 @@
-import { pool, tx, one, hash, jobs, access } from './base.js';
+import { pool, tx, one, hash, jobs, access, need } from './base.js';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { hash as passwordHash } from 'argon2';
@@ -31,10 +31,16 @@ export async function createUser(
   name: string,
   password: string,
   job: string,
-  role: string,
+  role: string | null,
   team: string,
   manager?: string,
 ) {
+  need(
+    jobs.includes(job) && (!role || access.includes(role)),
+    'Unsupported role',
+    422,
+    'RETIRED_ROLE',
+  );
   const u = await one(
     c,
     'INSERT INTO users(username,email,name,password_hash,team_id,manager_id,reviewer_id) VALUES($1,$1,$2,$3,$4,$5,$5) RETURNING id',
@@ -43,18 +49,13 @@ export async function createUser(
   for (const [kind, r] of [
     ['JOB', job],
     ['ACCESS', role],
-  ])
+  ]) {
+    if (!r) continue;
     await c.query(
       'INSERT INTO grants(user_id,kind,role,scope,team_id,reason) VALUES($1,$2,$3,$4,$5,$6)',
-      [
-        u.id,
-        kind,
-        r,
-        kind === 'JOB' || r === 'EMPLOYEE' ? 'SELF' : r === 'MANAGER' ? 'TEAM' : 'ALL',
-        team,
-        'INITIAL_SETUP',
-      ],
+      [u.id, kind, r, kind === 'JOB' ? 'SELF' : 'ALL', null, 'INITIAL_SETUP'],
     );
+  }
   return u.id;
 }
 export async function bootstrapAdmin(password?: string) {
@@ -145,25 +146,13 @@ async function main() {
         'BOSS',
         t.id,
       );
-      const manager = await createUser(
-        c,
-        'manager@demo.local',
-        'DEMO · Quản lý',
-        password,
-        'CONTENT',
-        'MANAGER',
-        t.id,
-        boss,
-      );
       await createUser(c, 'admin@demo.local', 'DEMO · Admin', password, 'CONTENT', 'ADMIN', t.id);
       for (const [email, name, role] of [
-        ['employee@demo.local', 'DEMO · Nhân viên', 'CONTENT'],
-        ['support@demo.local', 'DEMO · Thiết kế', 'DESIGNER'],
+        ['content@demo.local', 'DEMO · Nội dung', 'CONTENT'],
         ['hr@demo.local', 'DEMO · Nhân sự', 'HR'],
-        ['ads@demo.local', 'DEMO · Quảng cáo', 'ADS'],
-        ['sales@demo.local', 'DEMO · Vận hành', 'MARKETPLACE'],
+        ['marketplace@demo.local', 'DEMO · Vận hành sàn', 'MARKETPLACE'],
       ])
-        await createUser(c, email, name, password, role, 'EMPLOYEE', t.id, manager);
+        await createUser(c, email, name, password, role, null, t.id, boss);
       await c.query(
         'UPDATE settings SET value=value||\'{"assignment_boundary_confirmed":true,"report_week_confirmed":true,"deadline_reviewer_approval":true}\'::jsonb WHERE key=\'policies\'',
       );

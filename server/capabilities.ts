@@ -1,15 +1,6 @@
 import { canViewAccount } from './account-sharing.js';
 import { teamWork, displayRoles } from './handoff-access.js';
-import {
-  type DB,
-  type Actor,
-  rows,
-  isAdmin,
-  management,
-  hasJob,
-  moduleAllowed,
-  isExecutive,
-} from './base.js';
+import { type DB, type Actor, rows, isAdmin, management, hasJob, moduleAllowed } from './base.js';
 export async function capabilities(c: DB, a: Actor) {
   const admin = isAdmin(a),
     manager = teamWork(a),
@@ -32,7 +23,6 @@ export async function capabilities(c: DB, a: Actor) {
         ...(a.grants.length ? ['legacy'] : []),
         ...(admin ? ['legacy-users'] : []),
         ...(moduleAllowed(a, 'business') ? ['legacy-business'] : []),
-        ...(isExecutive(a) ? ['legacy-hr'] : []),
         ...(moduleAllowed(a, 'content') ? ['legacy-content'] : []),
       ],
     },

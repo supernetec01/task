@@ -30,13 +30,6 @@
       "KOC_BRIEF",
       "OTHER"
     ],
-    "DESIGNER": [
-      "DESIGN",
-      "THUMBNAIL",
-      "BANNER",
-      "SOURCE_HANDOVER",
-      "OTHER"
-    ],
     "MARKETPLACE": [
       "LISTING_CREATE",
       "LISTING_UPDATE",
@@ -53,16 +46,6 @@
       "SAMPLE_SHIP_FOLLOWUP",
       "OTHER"
     ],
-    "ADS": [
-      "AD_PLAN",
-      "AD_SETUP_RECORD",
-      "AD_CREATIVE_REVIEW",
-      "AD_MONITOR",
-      "AD_OPTIMIZE",
-      "AD_IMPORT",
-      "AD_ANALYSIS",
-      "OTHER"
-    ],
     "HR": [
       "CANDIDATE_INTAKE",
       "INTERVIEW_SCHEDULE",
@@ -70,36 +53,6 @@
       "HR_PROFILE_UPDATE",
       "HR_EVENT_CHECK",
       "EMPLOYEE_OFFBOARD",
-      "OTHER"
-    ],
-    "ACCOUNTANT": [
-      "DOCUMENT_CHECK",
-      "RECONCILE",
-      "PURCHASE_DOC_FOLLOWUP",
-      "PAYMENT_REQUEST_PROCESS",
-      "ADVANCE_SETTLEMENT",
-      "REIMBURSEMENT_PROCESS",
-      "SALES_INVOICE_REQUEST_PROCESS",
-      "OTHER"
-    ],
-    "WAREHOUSE": [
-      "SAMPLE_ISSUE",
-      "SAMPLE_RETURN",
-      "EQUIPMENT_HANDOVER",
-      "BIGSELLER_RECONCILE",
-      "OUTBOUND_REPORT",
-      "OTHER"
-    ],
-    "INTERN": [
-      "LEARNING",
-      "PRACTICE",
-      "MENTOR_REVIEW",
-      "OTHER"
-    ],
-    "TESTER_OPTIONAL": [
-      "BUG_REPRODUCE",
-      "FEATURE_REVIEW",
-      "RETEST",
       "OTHER"
     ]
   }

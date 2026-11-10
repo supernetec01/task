@@ -30,15 +30,6 @@ async function bundle(c: DB, a: Actor, id: string, selected: string[], why: stri
       scope: ['ADMIN', 'BOSS'].includes(r) ? 'ALL' : 'SELF',
       reason: why,
     });
-  if (selected.some((r) => specialistJobs.includes(r as any))) {
-    const existing = await one(
-      c,
-      "SELECT id FROM grants WHERE user_id=$1 AND kind='ACCESS' AND role='EMPLOYEE' AND revoked_at IS NULL AND valid_from<=now() AND (valid_to IS NULL OR valid_to>now())",
-      [id],
-    );
-    if (!existing)
-      await addGrant(c, a, id, { kind: 'ACCESS', role: 'EMPLOYEE', scope: 'SELF', reason: why });
-  }
 }
 export async function provisionUser(c: DB, a: Actor, b: any) {
   // Check attempted privilege escalation before any insert or schema coercion.

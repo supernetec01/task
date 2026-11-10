@@ -31,7 +31,6 @@ export async function seedTemplateMigration(c: DB) {
 export async function upgradeTaskForms(c: DB) {
   const seed = JSON.parse(readFileSync('config/task_templates.json', 'utf8')).templates;
   for (const definition of seed) {
-    if (definition.roles.every((r: string) => r === 'WAREHOUSE')) continue;
     const old = await one(
       c,
       'SELECT t.current_version,v.created_by,v.definition FROM task_templates t JOIN task_template_versions v ON v.code=t.code AND v.version=t.current_version WHERE t.code=$1 FOR UPDATE OF t',

@@ -44,18 +44,8 @@ export function need(
 export const hash = (x: string | Buffer) => createHash('sha256').update(x).digest('hex');
 export const dataDir = resolve(process.env.DATA_DIR || 'data');
 mkdirSync(dataDir, { recursive: true });
-export const jobs = [
-  'CONTENT',
-  'DESIGNER',
-  'MARKETPLACE',
-  'ADS',
-  'HR',
-  'ACCOUNTANT',
-  'WAREHOUSE',
-  'INTERN',
-  'TESTER_OPTIONAL',
-];
-export const access = ['EMPLOYEE', 'MANAGER', 'BOSS', 'ADMIN', 'HR_SENSITIVE', 'EXECUTIVE'];
+export const jobs = ['CONTENT', 'MARKETPLACE', 'HR'];
+export const access = ['BOSS', 'ADMIN'];
 export async function tx<T>(fn: (c: DB) => Promise<T>, isolation = 'READ COMMITTED'): Promise<T> {
   const c = await pool.connect();
   try {
@@ -83,44 +73,27 @@ export async function actor(c: DB, id: string): Promise<Actor> {
   need(u, 'Tài khoản đã bị vô hiệu hóa', 401, 'UNAUTHORIZED');
   u.grants = await rows(
     c,
-    'SELECT * FROM grants WHERE user_id=$1 AND revoked_at IS NULL AND valid_from<=clock_timestamp() AND (valid_to IS NULL OR valid_to>clock_timestamp())',
+    "SELECT * FROM grants WHERE user_id=$1 AND revoked_at IS NULL AND valid_from<=clock_timestamp() AND (valid_to IS NULL OR valid_to>clock_timestamp()) AND ((kind='JOB' AND role IN ('CONTENT','MARKETPLACE','HR') AND scope='SELF') OR (kind='ACCESS' AND role IN ('ADMIN','BOSS') AND scope='ALL'))",
     [id],
   );
   return u;
 }
 export const isAdmin = (a: Actor) =>
   a.grants.some((g) => g.kind === 'ACCESS' && g.role === 'ADMIN' && g.scope === 'ALL');
-export const isExecutive = (a: Actor) =>
-  a.grants.some((g) => g.kind === 'ACCESS' && g.role === 'EXECUTIVE' && g.scope === 'ALL');
 export const hasJob = (a: Actor, role: string) =>
-  a.grants.some((g) => g.kind === 'JOB' && g.role === role);
-export const manages = (a: Actor, u: { id: string; team_id: string | null }) =>
-  isAdmin(a) ||
-  a.grants.some(
-    (g) =>
-      g.kind === 'ACCESS' &&
-      ['MANAGER', 'BOSS'].includes(g.role) &&
-      (g.scope === 'ALL' || (g.scope === 'TEAM' && g.team_id === u.team_id)),
-  );
+  jobs.includes(role) &&
+  a.grants.some((g) => g.kind === 'JOB' && g.role === role && g.scope === 'SELF');
+export const manages = (a: Actor, _u: { id: string; team_id: string | null }) => management(a);
 export const management = (a: Actor) =>
-  isAdmin(a) ||
-  a.grants.some(
-    (g) => g.kind === 'ACCESS' && ['MANAGER', 'BOSS'].includes(g.role) && g.scope !== 'SELF',
-  );
+  isAdmin(a) || a.grants.some((g) => g.kind === 'ACCESS' && g.role === 'BOSS' && g.scope === 'ALL');
 export const moduleRole: Record<string, string[]> = {
-  content: ['CONTENT', 'DESIGNER'],
+  content: ['CONTENT'],
   business: ['MARKETPLACE'],
-  ads: ['ADS'],
   hr: ['HR'],
-  warehouse: ['WAREHOUSE'],
-  finance: ['ACCOUNTANT'],
-  issues: ['TESTER_OPTIONAL'],
-  resources: ['CONTENT', 'DESIGNER'],
+  resources: ['CONTENT'],
 };
 export function moduleAllowed(a: Actor, m: string) {
-  return (
-    isAdmin(a) || (m === 'hr' && isExecutive(a)) || (moduleRole[m] || []).some((r) => hasJob(a, r))
-  );
+  return isAdmin(a) || (moduleRole[m] || []).some((r) => hasJob(a, r));
 }
 export async function scopeUser(c: DB, a: Actor, id: string) {
   const u = await one(c, 'SELECT id,team_id FROM users WHERE id=$1', [id]);

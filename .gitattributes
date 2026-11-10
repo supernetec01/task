@@ -5,6 +5,3 @@
 *.md text eol=lf
 *.sql text eol=lf
 *.ps1 text eol=crlf
-# Preserve supplied approval documents, including their original line endings.
-docs/handoff-20261110/** -text
-docs/handoff-20261110/*.csv whitespace=cr-at-eol
