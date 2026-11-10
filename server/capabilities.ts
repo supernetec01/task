@@ -1,3 +1,4 @@
+import { canReadOrders, canWriteOrders } from './orders.js';
 import { canViewAccount } from './account-sharing.js';
 import { teamWork, displayRoles } from './handoff-access.js';
 import { type DB, type Actor, rows, isAdmin, management, hasJob, moduleAllowed } from './base.js';
@@ -29,10 +30,14 @@ export async function capabilities(c: DB, a: Actor) {
     {
       id: 'professional',
       label: 'Chuyên môn',
-      items: ['content', 'business', 'hr'].filter(
-        (m) =>
-          admin || hasJob(a, ({ content: 'CONTENT', business: 'MARKETPLACE', hr: 'HR' } as any)[m]),
-      ),
+      items: [
+        ...(canReadOrders(a) ? ['orders'] : []),
+        ...['content', 'business', 'hr'].filter(
+          (m) =>
+            admin ||
+            hasJob(a, ({ content: 'CONTENT', business: 'MARKETPLACE', hr: 'HR' } as any)[m]),
+        ),
+      ],
     },
     {
       id: 'requests',
@@ -55,6 +60,7 @@ export async function capabilities(c: DB, a: Actor) {
   return {
     menu_groups: groups,
     task_templates_admin: admin,
+    orders_write: canWriteOrders(a),
     create_task: worker || manager,
     team_work: manager,
     display_roles: displayRoles(a),

@@ -22,7 +22,7 @@ async function start() {
     "SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='platform_accounts' AND column_name='inherit_platform_viewers'",
   );
   if (!approved.rowCount) throw Error('MIGRATION_REQUIRED');
-  const handoff = await pool.query("SELECT 1 FROM schema_migrations WHERE version='011.sql'");
+  const handoff = await pool.query("SELECT 1 FROM schema_migrations WHERE version='012.sql'");
   if (!handoff.rowCount) throw Error('MIGRATION_REQUIRED');
   const app = await buildApp();
   await app.listen({ host, port });

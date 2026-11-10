@@ -15,6 +15,7 @@ import {
 import { logStream } from './logging.js';
 import { createTask } from './tasks.js';
 import { hrJobs } from './hr-jobs.js';
+import { orderReminders } from './orders.js';
 export function birthdayOccurrence(birthDate: string, today: string) {
   for (const year of [Number(today.slice(0, 4)), Number(today.slice(0, 4)) + 1]) {
     const day = String(year) + birthDate.slice(4);
@@ -142,6 +143,7 @@ export async function runJobs() {
       }
     }
     await hrJobs(c);
+    await orderReminders(c);
     const outbox = await rows(
       c,
       'SELECT o.* FROM outbox o JOIN users u ON u.id=o.user_id WHERE o.processed_at IS NULL AND u.active AND o.attempts<10 ORDER BY id FOR UPDATE OF o SKIP LOCKED LIMIT 100',
